@@ -50,6 +50,11 @@ def _version_key(name):
     return (0 if 'preview' in name or 'exp' in name else 1, numbers)
 
 
+def discover_models(client):
+    """Version publique, utilisée par la commande « python manage.py tester_ia »."""
+    return _discover_models(client)
+
+
 def _discover_models(client):
     """Modèles « flash » disponibles pour ce compte et capables de générer du texte."""
     try:
@@ -60,8 +65,8 @@ def _discover_models(client):
             if 'flash' in name and 'generateContent' in actions and 'image' not in name and 'tts' not in name:
                 names.append(name)
         return sorted(names, key=_version_key, reverse=True)
-    except Exception:
-        logger.exception("Impossible de lister les modèles Gemini")
+    except Exception as e:
+        logger.warning("Impossible de lister les modèles Gemini : %s", e)
         return []
 
 
@@ -113,7 +118,7 @@ def generate_intervention_description(type_panne: str, contexte: str = "") -> st
 
     global _working_model
     last_error = None
-    tried = set()
+    tried = []  # dans l'ordre, pour un message d'erreur exploitable
     queue = _models_to_try()
     discovered = False
 
@@ -121,7 +126,7 @@ def generate_intervention_description(type_panne: str, contexte: str = "") -> st
         model = queue.pop(0)
         if model in tried:
             continue
-        tried.add(model)
+        tried.append(model)
         try:
             response = client.models.generate_content(model=model, contents=prompt)
             description = (response.text or "").strip()
@@ -154,8 +159,9 @@ def generate_intervention_description(type_panne: str, contexte: str = "") -> st
             queue = [m for m in _discover_models(client) if m not in tried][:5]
 
     raise AIAgentError(
-        "Aucun modèle Gemini disponible pour cette clé. Indiquez un modèle valide dans "
-        f"GEMINI_MODEL (fichier .env). Dernière erreur : {last_error}"
+        "Aucun modèle Gemini disponible pour cette clé "
+        f"(modèles essayés : {', '.join(tried)}). Lancez « python manage.py tester_ia » "
+        f"puis indiquez un modèle valide dans GEMINI_MODEL (fichier .env). Dernière erreur : {last_error}"
     )
 
 
