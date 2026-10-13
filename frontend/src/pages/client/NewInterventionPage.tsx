@@ -15,7 +15,7 @@ export default function NewInterventionPage() {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
-  const [genNotice, setGenNotice] = useState<string | null>(null);
+  const [genNotice, setGenNotice] = useState<{ message: string; detail?: string } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -36,10 +36,11 @@ export default function NewInterventionPage() {
       const result = await generateDescription(form.type_panne);
       setForm((prev) => ({ ...prev, description: result.description }));
       if (result.source === 'modele') {
-        setGenNotice(
-          `L'assistant IA est indisponible${result.detail ? ` (${result.detail})` : ''} : ` +
-          'un modèle de description vous est proposé, complétez les parties entre crochets.'
-        );
+        setGenNotice({
+          message: "L'assistant IA est momentanément indisponible : un modèle de description vous est "
+            + 'proposé, complétez les parties entre crochets.',
+          detail: result.detail,
+        });
       }
     } catch (err) {
       setGenError("Impossible de générer une description pour l'instant. Vous pouvez la rédiger manuellement.");
@@ -114,7 +115,17 @@ export default function NewInterventionPage() {
                   </Button>
                 </div>
                 {genError && <div className="text-danger small mb-2">{genError}</div>}
-                {genNotice && <Alert variant="warning" className="py-2 small mb-2">{genNotice}</Alert>}
+                {genNotice && (
+                  <Alert variant="warning" className="py-2 small mb-2">
+                    {genNotice.message}
+                    {genNotice.detail && (
+                      <details className="mt-1">
+                        <summary>Détails techniques</summary>
+                        <div className="mono" style={{ wordBreak: 'break-word' }}>{genNotice.detail}</div>
+                      </details>
+                    )}
+                  </Alert>
+                )}
                 <Form.Control
                   as="textarea"
                   rows={5}

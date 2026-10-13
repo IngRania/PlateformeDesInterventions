@@ -9,6 +9,7 @@ Isoler cette logique dans un service (plutôt que dans la vue) permet de :
 - centraliser la gestion des erreurs et des timeouts
 """
 import logging
+import re
 
 from google import genai
 from google.genai import errors as genai_errors
@@ -18,14 +19,56 @@ logger = logging.getLogger(__name__)
 
 # Modèles essayés dans l'ordre : celui de la configuration (GEMINI_MODEL dans .env),
 # puis des modèles « flash » rapides et gratuits dans les limites du quota.
-# Si un modèle n'existe pas (ou plus), on passe automatiquement au suivant.
-FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+# Google retire régulièrement des modèles : si tous renvoient 404, on lit le modèle
+# recommandé dans le message d'erreur, puis on interroge la liste des modèles disponibles.
+FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash"]
+
+# Dernier modèle ayant fonctionné : réutilisé directement aux appels suivants.
+_working_model = None
 
 
 def _models_to_try():
     configured = getattr(settings, 'GEMINI_MODEL', '') or ''
-    models = [configured] if configured else []
-    return models + [m for m in FALLBACK_MODELS if m != configured]
+    candidates = [_working_model, configured, *FALLBACK_MODELS]
+    seen, models = set(), []
+    for m in candidates:
+        if m and m not in seen:
+            seen.add(m)
+            models.append(m)
+    return models
+
+
+def _suggested_model(error_message):
+    """Extrait le modèle conseillé par Google dans un message 404 (« use models/xxx »)."""
+    match = re.search(r'use (?:models/)?(gemini[\w.-]*)', error_message or '')
+    return match.group(1).rstrip('.') if match else None
+
+
+def _version_key(name):
+    """Trie les modèles du plus récent au plus ancien (ex : 3.8 > 2.5), versions « preview » en dernier."""
+    numbers = [int(n) for n in re.findall(r'\d+', name)]
+    return (0 if 'preview' in name or 'exp' in name else 1, numbers)
+
+
+def discover_models(client):
+    """Version publique, utilisée par la commande « python manage.py tester_ia »."""
+    return _discover_models(client)
+
+
+def _discover_models(client):
+    """Modèles « flash » disponibles pour ce compte et capables de générer du texte."""
+    try:
+        names = []
+        for model in client.models.list():
+            name = (getattr(model, 'name', '') or '').replace('models/', '')
+            actions = getattr(model, 'supported_actions', None) or []
+            if 'flash' in name and 'generateContent' in actions and 'image' not in name and 'tts' not in name:
+                names.append(name)
+        return sorted(names, key=_version_key, reverse=True)
+    except Exception as e:
+        logger.warning("Impossible de lister les modèles Gemini : %s", e)
+        return []
+
 
 MAX_INPUT_LENGTH = 300  # limite volontaire pour éviter les abus / prompts trop longs
 
@@ -73,31 +116,53 @@ def generate_intervention_description(type_panne: str, contexte: str = "") -> st
         logger.exception("Initialisation du client Gemini impossible")
         raise AIAgentError(f"Initialisation du client IA impossible : {e}")
 
+    global _working_model
     last_error = None
-    for model in _models_to_try():
+    tried = []  # dans l'ordre, pour un message d'erreur exploitable
+    queue = _models_to_try()
+    discovered = False
+
+    while queue:
+        model = queue.pop(0)
+        if model in tried:
+            continue
+        tried.append(model)
         try:
             response = client.models.generate_content(model=model, contents=prompt)
             description = (response.text or "").strip()
             if description:
+                if model != _working_model:
+                    logger.info("Modèle Gemini utilisé : %s", model)
+                _working_model = model
                 return description
             last_error = "réponse vide"
         except genai_errors.APIError as e:
             code = getattr(e, 'code', None)
             logger.warning("Gemini (%s) a échoué : %s", model, e)
             last_error = str(e)
-            if code == 404:
-                continue  # modèle inconnu : on essaie le suivant
             if code in (401, 403) or (code == 400 and 'API key' in str(e)):
                 raise AIAgentError("Clé GEMINI_API_KEY invalide ou non autorisée.")
             if code == 429:
                 raise AIAgentError("Quota gratuit de l'IA épuisé, réessayez plus tard.")
-            continue
+            if code == 404:
+                if _working_model == model:
+                    _working_model = None
+                suggestion = _suggested_model(str(e))
+                if suggestion and suggestion not in tried:
+                    queue.insert(0, suggestion)  # modèle conseillé par Google : essayé en priorité
         except Exception as e:
             logger.exception("Erreur inattendue avec le modèle %s", model)
             last_error = str(e)
-            continue
 
-    raise AIAgentError(f"Le service de génération est indisponible ({last_error}).")
+        if not queue and not discovered:
+            discovered = True
+            queue = [m for m in _discover_models(client) if m not in tried][:5]
+
+    raise AIAgentError(
+        "Aucun modèle Gemini disponible pour cette clé "
+        f"(modèles essayés : {', '.join(tried)}). Lancez « python manage.py tester_ia » "
+        f"puis indiquez un modèle valide dans GEMINI_MODEL (fichier .env). Dernière erreur : {last_error}"
+    )
 
 
 def fallback_description(type_panne: str, contexte: str = "") -> str:
