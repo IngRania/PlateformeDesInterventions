@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const [form, setForm] = useState({ old_password: '', new_password: '', new_password2: '' });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -25,16 +25,12 @@ export default function ChangePasswordPage() {
     setError(null);
     setLoading(true);
 
-    // On détermine la bonne page de login AVANT de vider le contexte utilisateur.
-    const isStaff = user?.role === 'TECHNICIEN' || user?.role === 'RESPONSABLE';
-    const redirectPath = isStaff ? '/staff-login' : '/login';
-
     try {
       await api.post('/auth/change-password/', form);
       setSuccess(true);
       setTimeout(() => {
         logout();
-        navigate(redirectPath);
+        navigate('/login');
       }, 1500);
     } catch (err: any) {
       const data = err.response?.data;

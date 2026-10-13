@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Container, Table, Navbar, Button, Modal, Form, Spinner, Alert, Row, Col } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Table, Button, Modal, Form, Spinner, Alert, Row, Col } from 'react-bootstrap';
+import { Search } from 'react-bootstrap-icons';
 import {
   listEquipments, createEquipment, updateEquipment, deleteEquipment,
   listClients, Equipment, ClientMini,
 } from '../../api/equipments';
-import { useAuth } from '../../context/AuthContext';
+import { EmptyState, Loading, PageHeader } from '../../components/ui';
+import { formatDate, matchesSearch } from '../../utils/format';
 
 const emptyForm = {
   client: '', type_equipement: '', reference: '', date_installation: '', notes: '',
 };
 
 export default function EquipmentsPage() {
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const [q, setQ] = useState('');
   const [items, setItems] = useState<Equipment[]>([]);
   const [clients, setClients] = useState<ClientMini[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,15 +24,16 @@ export default function EquipmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Pas de spinner pendant le rafraîchissement périodique (évite le clignotement)
   const load = () => {
-    setLoading(true);
     listEquipments().then((res) => setItems(res.data)).finally(() => setLoading(false));
   };
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 5000); // rafraîchit toutes les 5s
-   return () => clearInterval(interval);
+    listClients().then((res) => setClients(res.data)).catch(() => setClients([]));
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const openCreate = () => {
@@ -96,45 +97,29 @@ export default function EquipmentsPage() {
   };
 
   return (
-    <div>
-      <Navbar className="app-navbar px-4 py-3">
-        <div>
-          <div className="mono" style={{ color: 'var(--accent)', fontSize: '0.72rem', letterSpacing: '0.06em' }}>
-            {user?.role === 'ADMIN' ? 'ESPACE ADMIN' : 'ESPACE RESPONSABLE'}
-          </div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>
-            Équipements
-          </div>
-        </div>
-        <div className="ms-auto d-flex gap-2">
-          <Button variant="outline-light" size="sm" onClick={() => navigate('/responsable/interventions')}>
-            Demandes
-          </Button>
-          <Button variant="outline-light" size="sm" onClick={() => navigate('/responsable/calendrier')}>
-            Calendrier
-          </Button>
-          <Button variant="outline-light" size="sm" onClick={() => { logout(); navigate('/login'); }}>
-            Déconnexion
-          </Button>
-        </div>
-      </Navbar>
+    <>
+      <PageHeader
+        eyebrow="Parc matériel"
+        title="Gestion des équipements"
+        subtitle="Attribuez les équipements aux clients et suivez leur date d'installation."
+        actions={<Button variant="primary" onClick={openCreate}>+ Ajouter un équipement</Button>}
+      />
 
-      <Container className="py-5">
-        <div className="page-header d-flex justify-content-between align-items-end">
-          <div>
-            <div className="page-eyebrow">PARC MATÉRIEL</div>
-            <h4 className="fw-bold mb-0">Gestion des équipements</h4>
+        <div className="panel">
+          <div className="toolbar">
+            <div className="search-input">
+              <Search />
+              <Form.Control type="search" value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder="Type, référence, client…" />
+            </div>
+            <span className="toolbar-count">{items.length} équipement{items.length > 1 ? 's' : ''}</span>
           </div>
-          <Button className="btn-accent" onClick={openCreate}>+ Ajouter un équipement</Button>
-        </div>
-
-        <div className="app-card p-4">
           {loading ? (
-            <Spinner animation="border" style={{ color: 'var(--accent)' }} />
+            <Loading />
           ) : items.length === 0 ? (
-            <p className="text-muted mb-0">Aucun équipement enregistré pour l'instant.</p>
+            <EmptyState title="Aucun équipement" text="Aucun équipement enregistré pour l'instant." />
           ) : (
-            <Table responsive hover className="mb-0">
+            <Table responsive hover className="data-table mb-0">
               <thead>
                 <tr>
                   <th>Type</th>
@@ -145,16 +130,16 @@ export default function EquipmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((eq) => (
+                {items.filter((eq) => matchesSearch(q, eq.type_equipement, eq.reference, eq.client_nom, eq.client_email, eq.notes)).map((eq) => (
                   <tr key={eq.id}>
                     <td className="fw-semibold">{eq.type_equipement}</td>
                     <td className="mono small">{eq.reference}</td>
                     <td className="small">{eq.client_nom || eq.client_email}</td>
                     <td className="small text-muted">
-                      {eq.date_installation ? new Date(eq.date_installation).toLocaleDateString() : '—'}
+                      {formatDate(eq.date_installation)}
                     </td>
                     <td className="text-end">
-                      <Button size="sm" variant="outline-light" className="me-2" onClick={() => openEdit(eq)}>
+                      <Button size="sm" variant="outline-primary" className="me-2" onClick={() => openEdit(eq)}>
                         Modifier
                       </Button>
                       <Button size="sm" variant="outline-danger" onClick={() => handleDelete(eq)}>
@@ -167,7 +152,6 @@ export default function EquipmentsPage() {
             </Table>
           )}
         </div>
-      </Container>
 
       <Modal show={showModal} onHide={() => setShowModal(false)}>
         <Modal.Header closeButton>
@@ -179,7 +163,7 @@ export default function EquipmentsPage() {
             <Form.Group className="mb-3">
               <Form.Label>Client propriétaire</Form.Label>
               <Form.Select
-                className="form-control-dark"
+                
                 value={form.client}
                 onChange={handleClientChange}
               >
@@ -197,7 +181,7 @@ export default function EquipmentsPage() {
                 <Form.Group className="mb-3">
                   <Form.Label>Type d'équipement</Form.Label>
                   <Form.Control
-                    className="form-control-dark"
+                    
                     name="type_equipement"
                     value={form.type_equipement}
                     onChange={handleChange}
@@ -209,7 +193,7 @@ export default function EquipmentsPage() {
                 <Form.Group className="mb-3">
                   <Form.Label>Référence</Form.Label>
                   <Form.Control
-                    className="form-control-dark"
+                    
                     name="reference"
                     value={form.reference}
                     onChange={handleChange}
@@ -223,7 +207,7 @@ export default function EquipmentsPage() {
               <Form.Label>Date d'installation</Form.Label>
               <Form.Control
                 type="date"
-                className="form-control-dark"
+                
                 name="date_installation"
                 value={form.date_installation}
                 onChange={handleChange}
@@ -235,7 +219,7 @@ export default function EquipmentsPage() {
               <Form.Control
                 as="textarea"
                 rows={2}
-                className="form-control-dark"
+                
                 name="notes"
                 value={form.notes}
                 onChange={handleChange}
@@ -246,7 +230,7 @@ export default function EquipmentsPage() {
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowModal(false)}>Annuler</Button>
           <Button
-            className="btn-accent"
+            variant="primary"
             disabled={saving || !form.client || !form.type_equipement || !form.reference}
             onClick={handleSave}
           >
@@ -254,9 +238,6 @@ export default function EquipmentsPage() {
           </Button>
         </Modal.Footer>
       </Modal>
-      <Button variant="outline-light" size="sm" onClick={() => navigate('/responsable/tracking')}>
-         Localisation
-      </Button>
-    </div>
+    </>
   );
 }

@@ -15,12 +15,21 @@ class LocationConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
+        # Les clients n'ont pas accès au suivi des techniciens.
+        if user.role not in ('TECHNICIEN', 'RESPONSABLE', 'ADMIN'):
+            await self.close()
+            return
+
         self.user = user
-        await self.channel_layer.group_add(GROUP_NAME, self.channel_name)
+        # Seuls les responsables/admins reçoivent les positions ; le technicien ne fait qu'émettre.
+        self.listening = user.role in ('RESPONSABLE', 'ADMIN')
+        if self.listening:
+            await self.channel_layer.group_add(GROUP_NAME, self.channel_name)
         await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(GROUP_NAME, self.channel_name)
+        if getattr(self, 'listening', False):
+            await self.channel_layer.group_discard(GROUP_NAME, self.channel_name)
 
     async def receive(self, text_data):
         """
@@ -34,7 +43,9 @@ class LocationConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
             latitude = float(data['latitude'])
             longitude = float(data['longitude'])
-        except (json.JSONDecodeError, KeyError, ValueError):
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            return
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
             return
 
         location = await self.save_location(latitude, longitude)

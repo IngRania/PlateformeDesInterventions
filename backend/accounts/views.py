@@ -145,6 +145,31 @@ class UserListView(generics.ListAPIView):
         return {'request': self.request}
 
 
+class UserActivationView(APIView):
+    """PATCH /api/auth/users/<id>/ — { "is_active": bool } : l'admin active ou désactive un compte."""
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        try:
+            target = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"detail": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        if target.pk == request.user.pk:
+            return Response(
+                {"detail": "Vous ne pouvez pas désactiver votre propre compte."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        is_active = request.data.get('is_active')
+        if not isinstance(is_active, bool):
+            return Response({"is_active": ["Valeur booléenne attendue."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        target.is_active = is_active
+        target.save(update_fields=['is_active', 'updated_at'])
+        return Response(UserSerializer(target, context={'request': request}).data)
+
+
 def generate_otp():
     """Code à 6 chiffres, généré de façon cryptographiquement sûre."""
     return f"{secrets.randbelow(1_000_000):06d}"
