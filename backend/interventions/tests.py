@@ -156,3 +156,60 @@ class AIDescriptionTests(BaseInterventionTest):
         with override_settings(GEMINI_API_KEY=''):
             with self.assertRaisesMessage(AIAgentError, 'GEMINI_API_KEY'):
                 generate_intervention_description('Clim')
+
+
+class AIModelSelectionTests(BaseInterventionTest):
+    """Simule un compte Google où les anciens modèles ont été retirés."""
+
+    def _fake_client(self, available, listed=()):
+        from types import SimpleNamespace
+        from google.genai import errors as genai_errors
+
+        calls = []
+
+        def generate_content(model, contents):
+            calls.append(model)
+            if model in available:
+                return SimpleNamespace(text=f'Description par {model}')
+            raise genai_errors.APIError(404, {'error': {
+                'code': 404, 'status': 'NOT_FOUND',
+                'message': f'This model models/{model} is no longer available. Please update your code '
+                           'to use models/gemini-3.8-flash for the latest features and improvements. '
+                           'We recommend you to use the Interactions API.',
+            }})
+
+        models = SimpleNamespace(
+            generate_content=generate_content,
+            list=lambda: [SimpleNamespace(name=f'models/{n}', supported_actions=['generateContent']) for n in listed],
+        )
+        return SimpleNamespace(models=models), calls
+
+    def _run(self, client, model_setting):
+        from unittest.mock import patch
+        from django.test import override_settings
+        from .services import ai_agent
+
+        ai_agent._working_model = None
+        with override_settings(GEMINI_API_KEY='k', GEMINI_MODEL=model_setting), \
+                patch.object(ai_agent, 'FALLBACK_MODELS', ['gemini-2.0-flash']), \
+                patch.object(ai_agent.genai, 'Client', return_value=client):
+            return ai_agent.generate_intervention_description('Logiciel en panne')
+
+    def test_uses_model_suggested_in_404_message(self):
+        client, calls = self._fake_client(available={'gemini-3.8-flash'})
+        self.assertEqual(self._run(client, 'gemini-old'), 'Description par gemini-3.8-flash')
+        self.assertEqual(calls[-1], 'gemini-3.8-flash')
+
+    def test_discovers_model_from_list(self):
+        client, calls = self._fake_client(
+            available={'gemini-4.0-flash'},
+            listed=['gemini-1.5-flash', 'gemini-4.0-flash', 'gemini-4.0-flash-image'],
+        )
+        self.assertEqual(self._run(client, 'gemini-old'), 'Description par gemini-4.0-flash')
+
+    def test_remembers_working_model(self):
+        from .services import ai_agent
+
+        client, calls = self._fake_client(available={'gemini-3.8-flash'})
+        self._run(client, 'gemini-old')
+        self.assertEqual(ai_agent._working_model, 'gemini-3.8-flash')
