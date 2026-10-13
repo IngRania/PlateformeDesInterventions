@@ -123,3 +123,36 @@ class CalendarTests(BaseInterventionTest):
     def test_calendar_forbidden_for_client(self):
         self.client.force_authenticate(self.client_a)
         self.assertEqual(self.client.get('/api/interventions/calendar/').status_code, 403)
+
+
+class AIDescriptionTests(BaseInterventionTest):
+    def test_fallback_when_ai_unavailable(self):
+        from unittest.mock import patch
+        from .services.ai_agent import AIAgentError
+
+        self.client.force_authenticate(self.client_a)
+        with patch('interventions.views.generate_intervention_description',
+                   side_effect=AIAgentError('Quota épuisé')):
+            res = self.client.post('/api/interventions/generate-description/',
+                                   {'type_panne': 'Logiciel en panne'}, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['source'], 'modele')
+        self.assertIn('Logiciel en panne', res.data['description'])
+        self.assertEqual(res.data['detail'], 'Quota épuisé')
+
+    def test_ai_success(self):
+        from unittest.mock import patch
+
+        self.client.force_authenticate(self.client_a)
+        with patch('interventions.views.generate_intervention_description', return_value='Texte IA'):
+            res = self.client.post('/api/interventions/generate-description/',
+                                   {'type_panne': 'Clim'}, format='json')
+        self.assertEqual(res.data, {'description': 'Texte IA', 'source': 'ia'})
+
+    def test_missing_api_key_raises_clear_error(self):
+        from django.test import override_settings
+        from .services.ai_agent import AIAgentError, generate_intervention_description
+
+        with override_settings(GEMINI_API_KEY=''):
+            with self.assertRaisesMessage(AIAgentError, 'GEMINI_API_KEY'):
+                generate_intervention_description('Clim')

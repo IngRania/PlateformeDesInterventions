@@ -15,6 +15,7 @@ export default function NewInterventionPage() {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [genNotice, setGenNotice] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -29,10 +30,17 @@ export default function NewInterventionPage() {
       return;
     }
     setGenError(null);
+    setGenNotice(null);
     setGenerating(true);
     try {
-      const description = await generateDescription(form.type_panne);
-      setForm((prev) => ({ ...prev, description }));
+      const result = await generateDescription(form.type_panne);
+      setForm((prev) => ({ ...prev, description: result.description }));
+      if (result.source === 'modele') {
+        setGenNotice(
+          `L'assistant IA est indisponible${result.detail ? ` (${result.detail})` : ''} : ` +
+          'un modèle de description vous est proposé, complétez les parties entre crochets.'
+        );
+      }
     } catch (err) {
       setGenError("Impossible de générer une description pour l'instant. Vous pouvez la rédiger manuellement.");
     } finally {
@@ -106,6 +114,7 @@ export default function NewInterventionPage() {
                   </Button>
                 </div>
                 {genError && <div className="text-danger small mb-2">{genError}</div>}
+                {genNotice && <Alert variant="warning" className="py-2 small mb-2">{genNotice}</Alert>}
                 <Form.Control
                   as="textarea"
                   rows={5}

@@ -9,6 +9,9 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
+    # 'daphne' doit être en premier : `manage.py runserver` sert alors l'application ASGI,
+    # indispensable pour les WebSockets de localisation (/ws/location/).
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -120,7 +123,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-GEMINI_API_KEY = config('GEMINI_API_KEY')
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-2.5-flash')
 
 ASGI_APPLICATION = 'config.asgi.application'
 

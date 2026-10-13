@@ -1,0 +1,13 @@
+# Dépendances du backend : pip install -r requirements.txt
+Django>=5.0
+djangorestframework>=3.15
+djangorestframework-simplejwt>=5.3
+django-cors-headers>=4.3
+channels>=4.0
+daphne>=4.1          # serveur ASGI : nécessaire pour les WebSockets de localisation
+python-decouple>=3.8
+psycopg2-binary>=2.9 # PostgreSQL
+Pillow>=10.0
+xhtml2pdf>=0.2.11
+google-genai>=1.0    # génération de description par IA (Gemini)
+requests>=2.31

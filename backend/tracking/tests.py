@@ -48,3 +48,9 @@ class TrackingApiTests(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data[0]['technicien_matricule'], 'T0001')
         self.assertEqual(res.data[0]['intervention_en_cours']['id'], intervention.id)
+
+    def test_me_without_position_returns_empty_200(self):
+        self.client.force_authenticate(self.tech)
+        res = self.client.get('/api/tracking/me/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(res.data)

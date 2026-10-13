@@ -24,7 +24,7 @@ export default function PositionPage() {
   const [address, setAddress] = useState<string | null>(null);
 
   useEffect(() => {
-    getMyLocation().then((res) => setSaved(res.data)).catch(() => setSaved(null));
+    getMyLocation().then((res) => setSaved(res.data || null)).catch(() => setSaved(null));
   }, [sharing?.lastSentAt]);
 
   const live = sharing?.position;

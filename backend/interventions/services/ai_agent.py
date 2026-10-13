@@ -16,9 +16,16 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Modèle recommandé : rapide, gratuit dans les limites du quota, bien adapté
-# à une tâche de génération de texte courte.
-MODEL_NAME = "gemini-3.6-flash"
+# Modèles essayés dans l'ordre : celui de la configuration (GEMINI_MODEL dans .env),
+# puis des modèles « flash » rapides et gratuits dans les limites du quota.
+# Si un modèle n'existe pas (ou plus), on passe automatiquement au suivant.
+FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+
+
+def _models_to_try():
+    configured = getattr(settings, 'GEMINI_MODEL', '') or ''
+    models = [configured] if configured else []
+    return models + [m for m in FALLBACK_MODELS if m != configured]
 
 MAX_INPUT_LENGTH = 300  # limite volontaire pour éviter les abus / prompts trop longs
 
@@ -56,22 +63,56 @@ def generate_intervention_description(type_panne: str, contexte: str = "") -> st
     if contexte:
         prompt += f"Contexte additionnel : {contexte}\n"
 
+    api_key = getattr(settings, 'GEMINI_API_KEY', '')
+    if not api_key:
+        raise AIAgentError("Clé GEMINI_API_KEY absente du fichier .env du backend.")
+
     try:
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=prompt,
-        )
-        description = (response.text or "").strip()
+        client = genai.Client(api_key=api_key)
+    except Exception as e:
+        logger.exception("Initialisation du client Gemini impossible")
+        raise AIAgentError(f"Initialisation du client IA impossible : {e}")
 
-        if not description:
-            raise AIAgentError("Réponse vide de l'agent IA.")
+    last_error = None
+    for model in _models_to_try():
+        try:
+            response = client.models.generate_content(model=model, contents=prompt)
+            description = (response.text or "").strip()
+            if description:
+                return description
+            last_error = "réponse vide"
+        except genai_errors.APIError as e:
+            code = getattr(e, 'code', None)
+            logger.warning("Gemini (%s) a échoué : %s", model, e)
+            last_error = str(e)
+            if code == 404:
+                continue  # modèle inconnu : on essaie le suivant
+            if code in (401, 403) or (code == 400 and 'API key' in str(e)):
+                raise AIAgentError("Clé GEMINI_API_KEY invalide ou non autorisée.")
+            if code == 429:
+                raise AIAgentError("Quota gratuit de l'IA épuisé, réessayez plus tard.")
+            continue
+        except Exception as e:
+            logger.exception("Erreur inattendue avec le modèle %s", model)
+            last_error = str(e)
+            continue
 
-        return description
+    raise AIAgentError(f"Le service de génération est indisponible ({last_error}).")
 
-    except genai_errors.APIError as e:
-        logger.error("Erreur API Gemini: %s", e)
-        raise AIAgentError("Le service de génération est momentanément indisponible.")
-    except Exception:
-        logger.exception("Erreur inattendue dans l'agent IA")
-        raise AIAgentError("Une erreur inattendue est survenue.")
+
+def fallback_description(type_panne: str, contexte: str = "") -> str:
+    """
+    Suggestion générique utilisée quand l'IA est indisponible : le client
+    obtient quand même une base à compléter au lieu d'un champ vide.
+    """
+    type_panne = (type_panne or "").strip()[:MAX_INPUT_LENGTH]
+    texte = (
+        f"Je signale le problème suivant : {type_panne}. "
+        "Le dysfonctionnement a été constaté le [date] et se manifeste par [symptômes observés : "
+        "bruit, panne totale, fonctionnement intermittent, message d'erreur…]. "
+        "L'équipement concerné se trouve [localisation précise]. "
+        "Merci d'intervenir dans les meilleurs délais."
+    )
+    if contexte:
+        texte += f" Informations complémentaires : {contexte.strip()[:MAX_INPUT_LENGTH]}."
+    return texte

@@ -35,7 +35,7 @@ from .serializers import (
     PhotoUploadSerializer,
     TechnicianMiniSerializer,
 )
-from .services.ai_agent import AIAgentError, generate_intervention_description
+from .services.ai_agent import AIAgentError, fallback_description, generate_intervention_description
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -591,12 +591,18 @@ class InterventionAIDescriptionView(APIView):
         serializer = AIDescriptionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        type_panne = serializer.validated_data['type_panne']
+        contexte = serializer.validated_data.get('contexte', '')
         try:
-            description = generate_intervention_description(
-                type_panne=serializer.validated_data['type_panne'],
-                contexte=serializer.validated_data.get('contexte', ''),
-            )
+            description = generate_intervention_description(type_panne=type_panne, contexte=contexte)
         except AIAgentError as e:
-            return Response({"detail": str(e)}, status=503)
+            # L'IA est indisponible : on renvoie une suggestion générique plutôt qu'une erreur,
+            # avec la raison pour que le client (et le développeur) sachent ce qui s'est passé.
+            logger.warning("Génération IA indisponible : %s", e)
+            return Response({
+                "description": fallback_description(type_panne, contexte),
+                "source": "modele",
+                "detail": str(e),
+            }, status=200)
 
-        return Response({"description": description}, status=200)
+        return Response({"description": description, "source": "ia"}, status=200)
