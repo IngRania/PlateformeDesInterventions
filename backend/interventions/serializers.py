@@ -21,6 +21,14 @@ class InterventionCreateSerializer(serializers.ModelSerializer):
         fields = ['id', 'type_panne', 'description', 'priorite', 'date_souhaitee']
         read_only_fields = ['id']
 
+    def validate_date_souhaitee(self, value):
+        """La date souhaitée, si elle est renseignée, doit être postérieure à aujourd'hui."""
+        if value and value <= timezone.localdate():
+            raise serializers.ValidationError(
+                "La date souhaitée doit être postérieure à aujourd'hui."
+            )
+        return value
+
     def create(self, validated_data):
         request = self.context['request']
         return Intervention.objects.create(client=request.user, **validated_data)

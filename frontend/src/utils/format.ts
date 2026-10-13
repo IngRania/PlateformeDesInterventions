@@ -27,6 +27,18 @@ export const roleLabels: Record<string, string> = {
   CLIENT: 'Client',
 };
 
+/** Date locale au format AAAA-MM-JJ (sans passer par l'UTC). */
+export function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Première date acceptée pour une date souhaitée : demain (strictement après aujourd'hui). */
+export function minDesiredDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return toDateKey(d);
+}
+
 export function formatDate(value?: string | null): string {
   if (!value) return '—';
   // Une date seule ("2026-10-13") est interprétée en heure locale, pas en UTC.

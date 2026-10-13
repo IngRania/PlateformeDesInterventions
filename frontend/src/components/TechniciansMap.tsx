@@ -87,7 +87,7 @@ export default function TechniciansMap({ positions, selectedId, onSelect, height
                 {tech.technicien_matricule && <div>{tech.technicien_matricule}</div>}
                 <div>{online ? 'En ligne' : 'Hors ligne'} · {timeAgo(tech.updated_at)}</div>
                 {tech.intervention_en_cours && (
-                  <div>#{tech.intervention_en_cours.id} {tech.intervention_en_cours.type_panne}</div>
+                  <div>{tech.intervention_en_cours.type_panne}</div>
                 )}
               </Popup>
             </Marker>

@@ -51,7 +51,7 @@ export default function InterventionsTable({
       (!statut || i.statut === statut) &&
       (!priorite || i.priorite === priorite) &&
       matchesSearch(
-        q, `#${i.id}`, i.id, i.type_panne, i.description, i.client_nom, i.client_email,
+        q, i.type_panne, i.description, i.client_nom, i.client_email,
         i.technicien_nom, i.technicien_matricule, statutMeta[i.statut]?.label, prioriteMeta[i.priorite]?.label,
       )
     );
@@ -102,7 +102,7 @@ export default function InterventionsTable({
             type="search"
             value={q}
             onChange={(e) => updateQuery(e.target.value)}
-            placeholder="Rechercher (n°, type, client, technicien…)"
+            placeholder="Rechercher (type, client, technicien…)"
           />
         </div>
         <Form.Select value={priorite} onChange={(e) => setPriorite(e.target.value)} className="toolbar-select">
@@ -134,7 +134,6 @@ export default function InterventionsTable({
         <Table responsive hover className="data-table mb-0">
           <thead>
             <tr>
-              <th>N°</th>
               <th>Intervention</th>
               {columns.includes('client') && <th>Client</th>}
               {columns.includes('technicien') && <th>Technicien</th>}
@@ -147,7 +146,6 @@ export default function InterventionsTable({
           <tbody>
             {filtered.map((i) => (
               <tr key={i.id} className="row-clickable" onClick={() => navigate(`${detailBase}/${i.id}`)}>
-                <td className="mono text-muted">#{i.id}</td>
                 <td>
                   <div className="fw-semibold">{i.type_panne}</div>
                   {columns.includes('description') ? (

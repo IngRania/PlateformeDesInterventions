@@ -51,7 +51,7 @@ export function AssignModal({ intervention, onHide, onDone }: BaseProps) {
       <Modal.Body>
         {error && <Alert variant="danger">{error}</Alert>}
         <div className="modal-summary">
-          <div className="fw-semibold">#{intervention?.id} · {intervention?.type_panne}</div>
+          <div className="fw-semibold">{intervention?.type_panne}</div>
           <div className="text-muted small">{intervention?.client_nom} — {intervention?.description}</div>
         </div>
         <Form.Label>Technicien</Form.Label>
@@ -108,7 +108,7 @@ export function CloseModal({ intervention, onHide, onDone }: BaseProps) {
       <Modal.Body>
         {error && <Alert variant="danger">{error}</Alert>}
         <div className="modal-summary">
-          <div className="fw-semibold">#{intervention?.id} · {intervention?.type_panne}</div>
+          <div className="fw-semibold">{intervention?.type_panne}</div>
           <div className="text-muted small">{intervention?.client_nom}</div>
         </div>
         <Form.Group>
@@ -170,7 +170,7 @@ export function AvisModal({ intervention, onHide, onDone }: BaseProps) {
       <Modal.Body>
         {error && <Alert variant="danger">{error}</Alert>}
         <div className="modal-summary">
-          <div className="fw-semibold">#{intervention?.id} · {intervention?.type_panne}</div>
+          <div className="fw-semibold">{intervention?.type_panne}</div>
           <div className="text-muted small">Réalisée par {intervention?.technicien_nom || '—'}</div>
         </div>
         <Form.Label>Votre note</Form.Label>

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Row, Col, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import { Stars } from 'react-bootstrap-icons';
 import { useNavigate } from 'react-router-dom';
 import { createIntervention, generateDescription } from '../../api/interventions';
 import { PageHeader, Panel } from '../../components/ui';
+import { formatDate, minDesiredDate } from '../../utils/format';
 
 export default function NewInterventionPage() {
   const navigate = useNavigate();
@@ -15,6 +16,16 @@ export default function NewInterventionPage() {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const minDate = minDesiredDate();
+  // Comparaison de chaînes AAAA-MM-JJ : équivaut à une comparaison de dates.
+  const dateError = form.date_souhaitee && form.date_souhaitee < minDate
+    ? `La date souhaitée doit être postérieure à aujourd'hui (à partir du ${formatDate(minDate)}).`
+    : null;
+  // Message de validation natif du navigateur en français (sinon il s'affiche dans la langue du navigateur).
+  const dateRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    dateRef.current?.setCustomValidity(dateError ?? '');
+  }, [dateError]);
   const [genNotice, setGenNotice] = useState<{ message: string; detail?: string } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -52,6 +63,10 @@ export default function NewInterventionPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (dateError) {
+      setError(dateError);
+      return;
+    }
     setLoading(true);
     try {
       await createIntervention({
@@ -157,8 +172,13 @@ export default function NewInterventionPage() {
                       type="date"
                       name="date_souhaitee"
                       value={form.date_souhaitee}
+                      ref={dateRef}
+                      min={minDate}
                       onChange={handleChange}
+                      isInvalid={!!dateError}
                     />
+                    <Form.Control.Feedback type="invalid">{dateError}</Form.Control.Feedback>
+                    {!dateError && <Form.Text>À partir de demain.</Form.Text>}
                   </Form.Group>
                 </Col>
               </Row>

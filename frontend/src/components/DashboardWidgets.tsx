@@ -139,7 +139,7 @@ export function RecentPanel({ items, detailBase, listPath, title = 'Dernières i
             <li key={i.id} onClick={() => navigate(`${detailBase}/${i.id}`)}>
               <div className="recent-main">
                 <div className="fw-semibold">
-                  <span className="mono text-muted me-2">#{i.id}</span>{i.type_panne}
+                  {i.type_panne}
                 </div>
                 <div className="cell-sub">
                   {i.client_nom} · {i.technicien_nom ? `Tech. ${i.technicien_nom}` : 'Non affectée'} · {timeAgo(i.created_at)}

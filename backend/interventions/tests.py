@@ -213,3 +213,29 @@ class AIModelSelectionTests(BaseInterventionTest):
         client, calls = self._fake_client(available={'gemini-3.8-flash'})
         self._run(client, 'gemini-old')
         self.assertEqual(ai_agent._working_model, 'gemini-3.8-flash')
+
+
+class DateSouhaiteeValidationTests(BaseInterventionTest):
+    def _create(self, date_souhaitee):
+        self.client.force_authenticate(self.client_a)
+        return self.client.post('/api/interventions/create/', {
+            'type_panne': 'Clim', 'description': 'd', 'priorite': 'NORMALE',
+            'date_souhaitee': date_souhaitee,
+        }, format='json')
+
+    def test_today_rejected(self):
+        res = self._create(timezone.localdate().isoformat())
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('date_souhaitee', res.data)
+
+    def test_past_rejected(self):
+        res = self._create((timezone.localdate() - timedelta(days=3)).isoformat())
+        self.assertEqual(res.status_code, 400)
+
+    def test_tomorrow_accepted(self):
+        res = self._create((timezone.localdate() + timedelta(days=1)).isoformat())
+        self.assertEqual(res.status_code, 201)
+
+    def test_no_date_accepted(self):
+        res = self._create(None)
+        self.assertEqual(res.status_code, 201)

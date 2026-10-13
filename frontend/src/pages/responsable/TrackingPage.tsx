@@ -126,7 +126,7 @@ export default function TrackingPage() {
                         </div>
                         {p.intervention_en_cours && (
                           <div className="cell-sub text-truncate">
-                            #{p.intervention_en_cours.id} {p.intervention_en_cours.type_panne}
+                            {p.intervention_en_cours.type_panne}
                           </div>
                         )}
                       </div>
@@ -165,7 +165,7 @@ export default function TrackingPage() {
                       className="link-btn p-0"
                       onClick={() => navigate(`/responsable/interventions/${selectedPos.intervention_en_cours!.id}`)}
                     >
-                      #{selectedPos.intervention_en_cours.id} {selectedPos.intervention_en_cours.type_panne}
+                      {selectedPos.intervention_en_cours.type_panne}
                     </button>
                   ) : <div>Disponible</div>}
                   {selectedPos.intervention_en_cours && (

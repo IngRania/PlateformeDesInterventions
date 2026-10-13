@@ -107,7 +107,7 @@ export default function CalendarPage() {
     (!prioFilter || i.priorite === prioFilter) &&
     (!clientFilter || i.client_nom === clientFilter) &&
     matchesSearch(
-      search, `#${i.id}`, i.id, i.type_panne, i.description, i.client_nom, i.client_email,
+      search, i.type_panne, i.description, i.client_nom, i.client_email,
       row.technicien.matricule, techName(row.technicien), statutMeta[i.statut]?.label,
     );
 
@@ -141,9 +141,9 @@ export default function CalendarPage() {
         className={`cal-event ${i.statut === 'TERMINEE' ? 'done' : ''}`}
         style={{ ['--event-color' as any]: color }}
         onClick={() => navigate(`/responsable/interventions/${i.id}`)}
-        title={`#${i.id} · ${i.type_panne} — priorité ${prioriteMeta[i.priorite as Priorite]?.label}. Cliquer pour voir les détails.`}
+        title={`${i.type_panne} — priorité ${prioriteMeta[i.priorite as Priorite]?.label}. Cliquer pour voir les détails.`}
       >
-        <span className="cal-event-title"><span className="mono">#{i.id}</span> {i.type_panne}</span>
+        <span className="cal-event-title">{i.type_panne}</span>
         <span className="cal-event-sub">{i.client_nom}{showTech && ` · ${techName(row.technicien)}`}</span>
         <StatutBadge statut={i.statut} />
       </button>
@@ -193,7 +193,7 @@ export default function CalendarPage() {
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="N°, type de panne, client, technicien…"
+                  placeholder="Type de panne, client, technicien…"
                 />
               </div>
             </Col>

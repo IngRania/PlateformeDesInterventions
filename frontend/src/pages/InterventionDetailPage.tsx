@@ -147,7 +147,7 @@ export default function InterventionDetailPage() {
 
       <div className="detail-head">
         <div>
-          <div className="page-eyebrow">Intervention #{item.id}</div>
+          <div className="page-eyebrow">Détails de l'intervention</div>
           <h1 className="page-title">{item.type_panne}</h1>
           <div className="d-flex flex-wrap gap-2 align-items-center mt-2">
             <StatutBadge statut={item.statut} />
