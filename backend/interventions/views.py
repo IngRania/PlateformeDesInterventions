@@ -35,7 +35,7 @@ from .serializers import (
     PhotoUploadSerializer,
     TechnicianMiniSerializer,
 )
-from .services.ai_agent import AIAgentError, generate_intervention_description
+from .services.ai_agent import AIAgentError, fallback_description, generate_intervention_description
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -231,6 +231,49 @@ def _photo_data_uri(field, max_size=900):
     except Exception:
         logger.exception("Impossible de charger la photo %s", field)
         return ''
+STATUT_COULEURS = {
+    StatutIntervention.EN_ATTENTE: '#64748B',
+    StatutIntervention.AFFECTEE: '#2563EB',
+    StatutIntervention.EN_COURS: '#D97706',
+    StatutIntervention.TERMINEE: '#16A34A',
+}
+PRIORITE_COULEURS = {
+    Priorite.BASSE: '#64748B',
+    Priorite.NORMALE: '#0284C7',
+    Priorite.HAUTE: '#D97706',
+    Priorite.URGENTE: '#DC2626',
+}
+
+
+def _report_context(intervention):
+    """Valeurs calculées pour le rapport PDF (référence, couleurs, durée, chronologie, avis)."""
+    duree = None
+    if intervention.date_debut and intervention.date_cloture:
+        minutes = int((intervention.date_cloture - intervention.date_debut).total_seconds() // 60)
+        heures, minutes = divmod(minutes, 60)
+        duree = f"{heures} h {minutes:02d}" if heures else f"{minutes} min"
+
+    try:
+        avis = intervention.avis
+    except Intervention.avis.RelatedObjectDoesNotExist:
+        avis = None
+
+    return {
+        'reference': f"INT-{intervention.created_at:%Y}-{intervention.id:05d}",
+        'statut_couleur': STATUT_COULEURS.get(intervention.statut, '#64748B'),
+        'priorite_couleur': PRIORITE_COULEURS.get(intervention.priorite, '#64748B'),
+        'duree': duree,
+        'avis': avis,
+        'etoiles': range(1, 6),
+        'etapes': [
+            {'nom': 'Demande créée', 'date': intervention.created_at},
+            {'nom': 'Technicien affecté', 'date': intervention.date_affectation},
+            {'nom': 'Intervention débutée', 'date': intervention.date_debut},
+            {'nom': 'Intervention clôturée', 'date': intervention.date_cloture},
+        ],
+    }
+
+
 class InterventionPDFView(APIView):
     """
     GET /api/interventions/<id>/pdf/
@@ -259,7 +302,8 @@ class InterventionPDFView(APIView):
         try:
             html_string = render_to_string('interventions/report.html', {
                 'intervention': intervention,
-                'date_generation': tz.now().strftime('%d/%m/%Y %H:%M'),
+                **_report_context(intervention),
+                'date_generation': tz.localtime().strftime('%d/%m/%Y à %H:%M'),
                 'photo_avant_path': _photo_data_uri(intervention.photo_avant),
                 'photo_apres_path': _photo_data_uri(intervention.photo_apres),
             })
@@ -547,12 +591,18 @@ class InterventionAIDescriptionView(APIView):
         serializer = AIDescriptionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        type_panne = serializer.validated_data['type_panne']
+        contexte = serializer.validated_data.get('contexte', '')
         try:
-            description = generate_intervention_description(
-                type_panne=serializer.validated_data['type_panne'],
-                contexte=serializer.validated_data.get('contexte', ''),
-            )
+            description = generate_intervention_description(type_panne=type_panne, contexte=contexte)
         except AIAgentError as e:
-            return Response({"detail": str(e)}, status=503)
+            # L'IA est indisponible : on renvoie une suggestion générique plutôt qu'une erreur,
+            # avec la raison pour que le client (et le développeur) sachent ce qui s'est passé.
+            logger.warning("Génération IA indisponible : %s", e)
+            return Response({
+                "description": fallback_description(type_panne, contexte),
+                "source": "modele",
+                "detail": str(e),
+            }, status=200)
 
-        return Response({"description": description}, status=200)
+        return Response({"description": description, "source": "ia"}, status=200)

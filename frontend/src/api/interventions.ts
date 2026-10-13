@@ -151,9 +151,17 @@ export const getCalendar = (start: string, end: string) =>
 
 export const getStats = () => api.get<Stats>('/interventions/stats/');
 
-export async function generateDescription(typePanne: string): Promise<string> {
-  const response = await api.post('/interventions/generate-description/', {
+export interface GeneratedDescription {
+  description: string;
+  /** "ia" : texte généré par l'IA ; "modele" : suggestion générique (IA indisponible). */
+  source: 'ia' | 'modele';
+  /** Raison de l'indisponibilité de l'IA, le cas échéant. */
+  detail?: string;
+}
+
+export async function generateDescription(typePanne: string): Promise<GeneratedDescription> {
+  const response = await api.post<GeneratedDescription>('/interventions/generate-description/', {
     type_panne: typePanne,
   });
-  return response.data.description;
+  return response.data;
 }

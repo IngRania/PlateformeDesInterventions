@@ -20,7 +20,7 @@ export const WS_LOCATION_URL = (token: string) =>
 export const listLocations = () => api.get<TechnicianPosition[]>('/tracking/locations/');
 
 /** Dernière position partagée par le technicien connecté. */
-export const getMyLocation = () => api.get<TechnicianPosition>('/tracking/me/');
+export const getMyLocation = () => api.get<TechnicianPosition | null>('/tracking/me/');
 
 /** Envoi HTTP de la position (secours si le WebSocket est indisponible). */
 export const sendMyLocation = (latitude: number, longitude: number) =>

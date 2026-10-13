@@ -4,172 +4,230 @@
     <meta charset="utf-8">
     <title>Rapport d'intervention n° {{ intervention.id }}</title>
     <style>
+        /* xhtml2pdf : mise en page en tableaux, CSS 2.1 limité (pas de flex ni de border-radius fiable). */
         @page {
             size: A4;
-            margin: 1.8cm;
+            margin: 1.5cm 1.6cm 2cm 1.6cm;
             @frame footer {
-            -pdf-frame-content: footer-content;
-            bottom: 0.8cm;
-            margin-left: 1.8cm;
-            margin-right: 1.8cm;
-            height: 0.8cm;
-        }
-        }
-
-        body {
-            font-family: Helvetica, Arial, sans-serif;
-            font-size: 10.5pt;
-            color: #222222;
+                -pdf-frame-content: footer-content;
+                bottom: 0.7cm;
+                margin-left: 1.6cm;
+                margin-right: 1.6cm;
+                height: 0.9cm;
+            }
         }
 
-        /* En-tête */
-        table.entete { width: 100%; border-bottom: 2px solid #1f4e79; margin-bottom: 14pt; }
-        table.entete td { vertical-align: bottom; padding-bottom: 6pt; }
-        .marque { font-size: 11pt; font-weight: bold; color: #1f4e79; }
-        h1 { font-size: 19pt; margin: 0; color: #1f4e79; }
-        .date-gen { font-size: 8.5pt; color: #666666; text-align: right; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 9.5pt; color: #1E293B; line-height: 1.35; }
 
-        /* Titres de section */
-        h2 {
-            font-size: 12.5pt;
-            color: #1f4e79;
-            border-bottom: 1px solid #999999;
-            padding-bottom: 2pt;
-            margin-top: 16pt;
-            margin-bottom: 8pt;
-        }
+        /* ---------- Bandeau d'en-tête ---------- */
+        table.bandeau { width: 100%; background-color: #0F172A; }
+        table.bandeau td { padding: 14pt 16pt; vertical-align: middle; color: #FFFFFF; }
+        .logo { background-color: #2563EB; color: #FFFFFF; font-weight: bold; }
+        .marque { font-size: 12pt; font-weight: bold; color: #FFFFFF; }
+        .sous-marque { font-size: 8pt; color: #94A3B8; }
+        .doc-type { font-size: 8pt; color: #93C5FD; text-align: right; }
+        .doc-num { font-size: 18pt; font-weight: bold; color: #FFFFFF; text-align: right; }
+        .accent { height: 3pt; background-color: #2563EB; }
 
-        /* Tableau d'informations */
-        table.infos { width: 100%; border-collapse: collapse; }
-        table.infos td {
-            border: 1px solid #cccccc;
-            padding: 5pt 7pt;
-            vertical-align: top;
-        }
-        table.infos td.label {
-            width: 28%;
-            background-color: #eef3f8;
-            font-weight: bold;
-        }
+        /* ---------- Titre ---------- */
+        .titre { font-size: 17pt; font-weight: bold; color: #0F172A; margin: 14pt 0 2pt 0; }
+        .sous-titre { font-size: 8.5pt; color: #64748B; margin-bottom: 10pt; }
 
-        .description {
-            border: 1px solid #cccccc;
-            padding: 8pt;
-            background-color: #fafafa;
-        }
+        /* ---------- Bandeau de synthèse ---------- */
+        table.synthese { width: 100%; border: 1px solid #E2E8F0; background-color: #F8FAFC; }
+        table.synthese td { padding: 8pt 10pt; vertical-align: top; border-right: 1px solid #E2E8F0; width: 25%; }
+        .k-label { font-size: 7pt; color: #64748B; text-transform: uppercase; letter-spacing: 0.5pt; }
+        .k-value { font-size: 12pt; font-weight: bold; color: #0F172A; margin-top: 2pt; }
+        .badge { font-size: 9pt; font-weight: bold; color: #FFFFFF; padding: 3pt 6pt; }
+
+        /* ---------- Sections ---------- */
+        table.section { width: 100%; margin-top: 14pt; margin-bottom: 6pt; -pdf-keep-with-next: true; }
+        table.section td { padding: 0 0 3pt 0; border-bottom: 1px solid #CBD5E1; vertical-align: bottom; }
+        td.section-num { width: 16pt; font-size: 10.5pt; font-weight: bold; color: #2563EB; border-bottom: 2pt solid #2563EB; }
+        td.section-titre { font-size: 10.5pt; font-weight: bold; color: #0F172A; padding-left: 4pt; }
+
+        table.cartes { width: 100%; }
+        table.cartes td.carte { width: 49%; vertical-align: top; border: 1px solid #E2E8F0; padding: 0; }
+        table.cartes td.espace { width: 2%; padding: 0; }
+        .carte-titre { background-color: #F1F5F9; font-size: 7.5pt; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5pt; padding: 5pt 8pt; border-bottom: 1px solid #E2E8F0; }
+        table.kv { width: 100%; }
+        table.kv td { padding: 3pt 8pt; vertical-align: top; }
+        table.kv td.k { color: #64748B; width: 38%; }
+        table.kv td.v { font-weight: bold; color: #0F172A; }
+
+        /* Chronologie */
+        table.chrono { width: 100%; }
+        table.chrono td { text-align: center; vertical-align: top; padding: 6pt 4pt; width: 25%; }
+        .etape-on { border-top: 3pt solid #2563EB; }
+        .etape-off { border-top: 3pt solid #E2E8F0; }
+        .etape-nom { font-weight: bold; font-size: 8.5pt; color: #0F172A; }
+        .etape-nom-off { font-weight: bold; font-size: 8.5pt; color: #94A3B8; }
+        .etape-date { font-size: 7.5pt; color: #64748B; }
+
+        .bloc { border: 1px solid #E2E8F0; border-left: 3pt solid #2563EB; padding: 8pt 10pt; background-color: #FFFFFF; }
+        .bloc-vert { border-left-color: #16A34A; }
+        .vide-texte { color: #94A3B8; font-style: italic; }
 
         /* Photos */
         table.photos { width: 100%; }
-        table.photos td { text-align: center; vertical-align: top; padding: 6pt; }
-        .legende { font-weight: bold; margin-bottom: 4pt; }
-        .vide { color: #888888; font-style: italic; padding: 30pt 0; border: 1px dashed #cccccc; }
+        table.photos td { width: 49%; vertical-align: top; text-align: center; border: 1px solid #E2E8F0; padding: 6pt; }
+        table.photos td.espace { width: 2%; border: none; padding: 0; }
+        .legende { font-size: 7.5pt; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5pt; margin-bottom: 5pt; }
+        .photo-vide { color: #94A3B8; font-style: italic; padding: 40pt 0; background-color: #F8FAFC; }
 
-        .avis { border: 1px solid #cccccc; padding: 8pt; background-color: #fafafa; }
+        /* Avis */
+        table.etoiles td { width: 12pt; height: 8pt; padding: 0; }
+        .etoile-on { background-color: #F59E0B; }
+        .etoile-off { background-color: #E2E8F0; }
 
-        #footer-content { font-size: 8pt; color: #888888; text-align: center; }
+        /* Signatures */
+        table.signatures { width: 100%; margin-top: 4pt; }
+        table.signatures td { width: 49%; vertical-align: top; border: 1px solid #E2E8F0; padding: 6pt 8pt; height: 55pt; }
+        table.signatures td.espace { width: 2%; border: none; padding: 0; }
+        .sig-label { font-size: 7.5pt; color: #64748B; }
+
+        #footer-content { font-size: 7.5pt; color: #94A3B8; border-top: 1px solid #E2E8F0; padding-top: 4pt; text-align: center; }
     </style>
 </head>
 <body>
 
-<!-- En-tête -->
-<table class="entete">
+<!-- ===== En-tête ===== -->
+<table class="bandeau">
+    <tr>
+        <td width="55%">
+            <div class="marque"><span class="logo">&nbsp;IT&nbsp;</span>&nbsp; InTech Interventions</div>
+            <div class="sous-marque">Plateforme de gestion des interventions techniques</div>
+        </td>
+        <td width="45%" style="padding-right: 18pt;">
+            <div class="doc-type">RAPPORT D'INTERVENTION</div>
+            <div class="doc-num">N° {{ reference }}</div>
+        </td>
+    </tr>
+</table>
+<div class="accent">&nbsp;</div>
+
+<div class="titre">{{ intervention.type_panne }}</div>
+<div class="sous-titre">Document généré le {{ date_generation }} &nbsp;·&nbsp; Demande créée le {{ intervention.created_at|date:"d/m/Y à H:i" }}</div>
+
+<!-- ===== Synthèse ===== -->
+<table class="synthese">
     <tr>
         <td>
-            <div class="marque">InTech Interventions</div>
-            <h1>Rapport d'intervention n° {{ intervention.id }}</h1>
+            <div class="k-label">Statut</div>
+            <div class="k-value"><span class="badge" style="background-color: {{ statut_couleur }};">&nbsp;{{ intervention.get_statut_display }}&nbsp;</span></div>
         </td>
-        <td class="date-gen">Généré le {{ date_generation }}</td>
+        <td>
+            <div class="k-label">Priorité</div>
+            <div class="k-value"><span class="badge" style="background-color: {{ priorite_couleur }};">&nbsp;{{ intervention.get_priorite_display }}&nbsp;</span></div>
+        </td>
+        <td>
+            <div class="k-label">Durée d'intervention</div>
+            <div class="k-value">{{ duree|default:"—" }}</div>
+        </td>
+        <td style="border-right: none;">
+            <div class="k-label">Satisfaction client</div>
+            <div class="k-value">{% if avis %}{{ avis.note }}/5{% else %}—{% endif %}</div>
+        </td>
     </tr>
 </table>
 
-<!-- Informations générales -->
-<h2>Informations générales</h2>
-<table class="infos">
+<!-- ===== 1. Intervenants ===== -->
+<table class="section"><tr><td class="section-num">1</td><td class="section-titre">Intervenants</td></tr></table>
+<table class="cartes">
     <tr>
-        <td class="label">Type de panne</td>
-        <td>{{ intervention.type_panne }}</td>
-    </tr>
-    <tr>
-        <td class="label">Priorité</td>
-        <td>{{ intervention.priorite }}</td>
-    </tr>
-    <tr>
-        <td class="label">Statut</td>
-        <td>{{ intervention.statut }}</td>
-    </tr>
-    <tr>
-        <td class="label">Client</td>
-        <td>{{ intervention.client.full_name }}</td>
-    </tr>
-    <tr>
-        <td class="label">Technicien</td>
-        <td>
-            {% if intervention.technicien %}
-            {{ intervention.technicien.first_name }} {{ intervention.technicien.last_name }}
-            {% else %}
-            Non affecté
-            {% endif %}
+        <td class="carte">
+            <div class="carte-titre">Client</div>
+            <table class="kv">
+                <tr><td class="k">Nom</td><td class="v">{{ intervention.client.full_name|default:"—" }}</td></tr>
+                <tr><td class="k">Email</td><td class="v">{{ intervention.client.email }}</td></tr>
+                <tr><td class="k">Téléphone</td><td class="v">{{ intervention.client.phone|default:"—" }}</td></tr>
+            </table>
         </td>
-    </tr>
-    <tr>
-        <td class="label">Créée le</td>
-        <td>{{ intervention.created_at|date:"d/m/Y H:i" }}</td>
-    </tr>
-    <tr>
-        <td class="label">Date souhaitée</td>
-        <td>{{ intervention.date_souhaitee|default:"Non spécifiée" }}</td>
-    </tr>
-    <tr>
-        <td class="label">Début de l'intervention</td>
-        <td>{{ intervention.date_debut|date:"d/m/Y H:i"|default:"—" }}</td>
-    </tr>
-    <tr>
-        <td class="label">Clôture</td>
-        <td>{{ intervention.date_cloture|date:"d/m/Y H:i"|default:"—" }}</td>
+        <td class="espace"></td>
+        <td class="carte">
+            <div class="carte-titre">Technicien</div>
+            <table class="kv">
+                {% if intervention.technicien %}
+                <tr><td class="k">Nom</td><td class="v">{{ intervention.technicien.full_name|default:"—" }}</td></tr>
+                <tr><td class="k">Matricule</td><td class="v">{{ intervention.technicien.matricule|default:"—" }}</td></tr>
+                <tr><td class="k">Affecté par</td><td class="v">{{ intervention.affectee_par.full_name|default:"—" }}</td></tr>
+                {% else %}
+                <tr><td class="k" colspan="2">Non affecté</td></tr>
+                {% endif %}
+            </table>
+        </td>
     </tr>
 </table>
 
-<!-- Description -->
-<h2>Description de la demande</h2>
-<div class="description">{{ intervention.description|linebreaksbr }}</div>
+<!-- ===== 2. Chronologie ===== -->
+<table class="section"><tr><td class="section-num">2</td><td class="section-titre">Chronologie</td></tr></table>
+<table class="chrono">
+    <tr>
+        {% for etape in etapes %}
+        <td class="{% if etape.date %}etape-on{% else %}etape-off{% endif %}">
+            <div class="{% if etape.date %}etape-nom{% else %}etape-nom-off{% endif %}">{{ etape.nom }}</div>
+            <div class="etape-date">{% if etape.date %}{{ etape.date|date:"d/m/Y H:i" }}{% else %}—{% endif %}</div>
+        </td>
+        {% endfor %}
+    </tr>
+</table>
+<div class="sous-titre" style="margin: 2pt 0 0 0;">Date souhaitée par le client : {{ intervention.date_souhaitee|date:"d/m/Y"|default:"non spécifiée" }}</div>
 
-<!-- Photos -->
-<h2>Photos</h2>
+<!-- ===== 3. Description ===== -->
+<table class="section"><tr><td class="section-num">3</td><td class="section-titre">Description de la demande</td></tr></table>
+<div class="bloc">{{ intervention.description|linebreaksbr }}</div>
+
+<!-- ===== 4. Compte-rendu ===== -->
+<table class="section"><tr><td class="section-num">4</td><td class="section-titre">Compte-rendu du technicien</td></tr></table>
+<div class="bloc bloc-vert">
+    {% if intervention.compte_rendu %}{{ intervention.compte_rendu|linebreaksbr }}{% else %}<span class="vide-texte">Aucun compte-rendu.</span>{% endif %}
+</div>
+
+<!-- ===== 5. Photos ===== -->
+<table class="section"><tr><td class="section-num">5</td><td class="section-titre">Photos de l'intervention</td></tr></table>
 <table class="photos">
     <tr>
-        <td width="50%">
-            <div class="legende">Avant l'intervention</div>
-            {% if photo_avant_path %}
-            <img src="{{ photo_avant_path }}" width="240">
-            {% else %}
-            <div class="vide">Aucune photo</div>
-            {% endif %}
+        <td>
+            <div class="legende">Avant intervention</div>
+            {% if photo_avant_path %}<img src="{{ photo_avant_path }}" width="225">{% else %}<div class="photo-vide">Aucune photo</div>{% endif %}
         </td>
-        <td width="50%">
-            <div class="legende">Après l'intervention</div>
-            {% if photo_apres_path %}
-            <img src="{{ photo_apres_path }}" width="240">
-            {% else %}
-            <div class="vide">Aucune photo</div>
-            {% endif %}
+        <td class="espace"></td>
+        <td>
+            <div class="legende">Après intervention</div>
+            {% if photo_apres_path %}<img src="{{ photo_apres_path }}" width="225">{% else %}<div class="photo-vide">Aucune photo</div>{% endif %}
         </td>
     </tr>
 </table>
 
-<!-- Avis du client -->
-{% if intervention.avis %}
-<h2>Avis du client</h2>
-<div class="avis">
-    <b>Note :</b> {{ intervention.avis.note }}/5
-    {% if intervention.avis.commentaire %}
-    <br><br>{{ intervention.avis.commentaire|linebreaksbr }}
-    {% endif %}
+<!-- ===== 6. Avis ===== -->
+<table class="section"><tr><td class="section-num">6</td><td class="section-titre">Avis du client</td></tr></table>
+{% if avis %}
+<div class="bloc" style="border-left-color: #F59E0B;">
+    <div style="font-size: 11pt; font-weight: bold; margin-bottom: 4pt;">Note : {{ avis.note }}/5</div>
+    <table class="etoiles"><tr>
+        {% for n in etoiles %}<td class="{% if n <= avis.note %}etoile-on{% else %}etoile-off{% endif %}">&nbsp;</td><td style="width: 3pt;"></td>{% endfor %}
+        <td style="width: 200pt;"></td>
+    </tr></table>
+    {% if avis.commentaire %}<div style="margin-top: 6pt;">« {{ avis.commentaire|linebreaksbr }} »</div>{% endif %}
+    <div class="etape-date" style="margin-top: 4pt;">Avis déposé le {{ avis.created_at|date:"d/m/Y" }}</div>
 </div>
+{% else %}
+<div class="bloc" style="border-left-color: #CBD5E1;"><span class="vide-texte">Le client n'a pas encore donné son avis.</span></div>
 {% endif %}
 
-<!-- Pied de page -->
+<!-- ===== Validation ===== -->
+<table class="section"><tr><td class="section-num">7</td><td class="section-titre">Validation</td></tr></table>
+<table class="signatures">
+    <tr>
+        <td><div class="sig-label">Signature du technicien</div></td>
+        <td class="espace"></td>
+        <td><div class="sig-label">Signature du client</div></td>
+    </tr>
+</table>
+
+<!-- ===== Pied de page ===== -->
 <div id="footer-content">
-    InTech Interventions — Rapport n° {{ intervention.id }} — Page <pdf:pagenumber> / <pdf:pagecount>
+    InTech Interventions — Rapport N° {{ reference }} — Document confidentiel — Page <pdf:pagenumber> / <pdf:pagecount>
 </div>
 
 </body>

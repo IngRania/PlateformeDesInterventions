@@ -21,7 +21,7 @@ class TechnicianLocationListView(generics.ListAPIView):
 
 class MyLocationView(APIView):
     """
-    GET  /api/tracking/me/ — dernière position partagée par le technicien connecté.
+    GET  /api/tracking/me/ — dernière position partagée par le technicien connecté (null si aucune).
     POST /api/tracking/me/ — { latitude, longitude } : alternative HTTP au WebSocket
     (réseau mobile instable, proxy bloquant les WebSockets...). La position est
     ensuite diffusée aux cartes ouvertes comme si elle venait du WebSocket.
@@ -30,8 +30,9 @@ class MyLocationView(APIView):
 
     def get(self, request):
         location = TechnicianLocation.objects.filter(technicien=request.user).first()
+        # Pas encore de position : réponse vide (200) plutôt qu'une erreur 404.
         if location is None:
-            return Response({"detail": "Aucune position partagée pour l'instant."}, status=404)
+            return Response(None)
         return Response(TechnicianLocationSerializer(location).data)
 
     def post(self, request):
