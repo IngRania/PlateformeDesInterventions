@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner, Badge, Navbar, InputGroup } from 'react-bootstrap';
+import { Row, Col, Card, Form, Button, Alert, Spinner, Badge, InputGroup } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { PageHeader } from '../components/ui';
 import api from '../api/axios';
 import {
-  Wrench, BoxArrowRight, CameraFill, Envelope, Person, Telephone,
+  CameraFill, Envelope, Person, Telephone,
   Pencil, LockFill, ExclamationCircleFill, CheckCircleFill,
 } from 'react-bootstrap-icons';
 
@@ -16,7 +17,7 @@ const roleLabels: Record<string, string> = {
 };
 
 export default function ProfilePage() {
-  const { user, logout, setUser } = useAuth();
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,29 +86,11 @@ export default function ProfilePage() {
     }
   };
 
-  const handleLogout = () => {
-    const isStaff = user.role === 'TECHNICIEN' || user.role === 'RESPONSABLE';
-    logout();
-    navigate(isStaff ? '/staff-login' : '/login');
-  };
-
  return (
-  <div className="profile-page">
-    <Navbar className="profile-navbar px-4 py-3" variant="dark">
-      <Navbar.Brand className="fw-bold d-flex align-items-center gap-2">
-        <span className="brand-icon"><Wrench size={20} /></span>
-        Mon espace
-      </Navbar.Brand>
-      <div className="ms-auto">
-        <Button variant="outline-light" size="sm" className="logout-btn" onClick={handleLogout}>
-          <BoxArrowRight className="me-2" />Déconnexion
-        </Button>
-      </div>
-    </Navbar>
-
-    <Container className="py-5 position-relative" style={{ zIndex: 1 }}>
-      <Row className="justify-content-center">
-        <Col xs={12} md={9} lg={7} xl={6}>
+  <>
+    <PageHeader eyebrow="Compte" title="Mon profil" subtitle="Vos informations personnelles et votre photo." />
+      <Row>
+        <Col xs={12} lg={9} xl={7}>
           <Card className="profile-card">
             {/* ===== Bandeau ===== */}
             <div className="profile-header">
@@ -239,7 +222,6 @@ export default function ProfilePage() {
           </Card>
         </Col>
       </Row>
-    </Container>
-  </div>
+  </>
 );
 }

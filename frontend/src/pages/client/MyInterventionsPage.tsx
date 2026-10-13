@@ -1,71 +1,55 @@
-import { useEffect, useState } from 'react';
-import { Container, Table, Badge, Navbar, Button, Spinner } from 'react-bootstrap';
+import { useState } from 'react';
+import { Alert, Button } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import { listInterventions, Intervention } from '../../api/interventions';
-import { useAuth } from '../../context/AuthContext';
-
-const statutColors: Record<string, string> = {
-  EN_ATTENTE: 'secondary',
-  AFFECTEE: 'info',
-  EN_COURS: 'warning',
-  TERMINEE: 'success',
-};
+import { FileEarmarkPdf, PlusLg, StarFill } from 'react-bootstrap-icons';
+import { downloadPDF, Intervention } from '../../api/interventions';
+import { useInterventions } from '../../hooks/useData';
+import InterventionsTable from '../../components/InterventionsTable';
+import { AvisModal } from '../../components/InterventionModals';
+import { PageHeader } from '../../components/ui';
 
 export default function MyInterventionsPage() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
-  const [items, setItems] = useState<Intervention[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    listInterventions().then((res) => setItems(res.data)).finally(() => setLoading(false));
-  }, []);
+  const { items, loading, error, reload } = useInterventions();
+  const [rating, setRating] = useState<Intervention | null>(null);
 
   return (
-    <div>
-      <Navbar className="px-4 py-3" bg="primary" variant="dark">
-        <Navbar.Brand className="fw-bold">Espace Client</Navbar.Brand>
-        <div className="ms-auto d-flex gap-2">
-          <Button variant="outline-light" size="sm" onClick={() => navigate('/client/nouvelle-demande')}>
-            Nouvelle demande
+    <>
+      <PageHeader
+        eyebrow="Espace client"
+        title="Mes interventions"
+        subtitle="Suivez l'avancement et l'historique de toutes vos demandes."
+        actions={
+          <Button variant="primary" onClick={() => navigate('/client/nouvelle-demande')}>
+            <PlusLg className="me-2" /> Nouvelle demande
           </Button>
-          <Button variant="outline-light" size="sm" onClick={() => { logout(); navigate('/login'); }}>
-            Déconnexion
-          </Button>
-        </div>
-      </Navbar>
-
-      <Container className="py-5">
-        <h4 className="fw-bold mb-4">Mes demandes d'intervention</h4>
-        {loading ? (
-          <Spinner animation="border" />
-        ) : items.length === 0 ? (
-          <p className="text-muted">Aucune demande pour l'instant.</p>
-        ) : (
-          <Table responsive hover>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Priorité</th>
-                <th>Statut</th>
-                <th>Technicien</th>
-                <th>Créée le</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((i) => (
-                <tr key={i.id}>
-                  <td>{i.type_panne}</td>
-                  <td>{i.priorite}</td>
-                  <td><Badge bg={statutColors[i.statut]}>{i.statut.replace('_', ' ')}</Badge></td>
-                  <td>{i.technicien_nom || '—'}</td>
-                  <td>{new Date(i.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+        }
+      />
+      {error && <Alert variant="danger">{error}</Alert>}
+      <InterventionsTable
+        items={items}
+        loading={loading}
+        detailBase="/client/interventions"
+        columns={['technicien']}
+        emptyAction={
+          <Button variant="primary" onClick={() => navigate('/client/nouvelle-demande')}>Créer ma première demande</Button>
+        }
+        renderActions={(i) => i.statut === 'TERMINEE' && (
+          <>
+            <Button size="sm" variant="outline-secondary" onClick={() => downloadPDF(i.id)} title="Télécharger le rapport PDF">
+              <FileEarmarkPdf />
+            </Button>
+            {i.avis ? (
+              <span className="rating-chip"><StarFill /> {i.avis.note}/5</span>
+            ) : (
+              <Button size="sm" variant="outline-warning" onClick={() => setRating(i)}>
+                <StarFill className="me-1" /> Avis
+              </Button>
+            )}
+          </>
         )}
-      </Container>
-    </div>
+      />
+      <AvisModal intervention={rating} onHide={() => setRating(null)} onDone={() => { setRating(null); reload(); }} />
+    </>
   );
 }

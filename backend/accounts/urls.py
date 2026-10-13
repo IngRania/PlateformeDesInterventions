@@ -9,7 +9,7 @@ from .views import (
     ForgotPasswordView,
     ResetPasswordView,
     StaffCreateView,
-    UserListView, TechnicianListView,
+    UserListView, TechnicianListView, UserActivationView,
 )
 
 urlpatterns = [
@@ -23,5 +23,6 @@ urlpatterns = [
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('staff/', StaffCreateView.as_view(), name='staff-create'),
     path('users/', UserListView.as_view(), name='user-list'),
+    path('users/<int:pk>/', UserActivationView.as_view(), name='user-activation'),
     path('technicians/', TechnicianListView.as_view(), name='technician-list'),
 ]

@@ -1,12 +1,9 @@
 import { useState } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner, Navbar } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Row, Col, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
+import { PageHeader, Panel } from '../components/ui';
 
 export default function CreateStaffPage() {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
 
   const [form, setForm] = useState({
     first_name: '',
@@ -49,36 +46,16 @@ export default function CreateStaffPage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
-    <div className="profile-page">
-      <Navbar className="profile-navbar px-4 py-3" variant="dark">
-        <Navbar.Brand className="fw-bold">Espace Admin</Navbar.Brand>
-        <div className="ms-auto d-flex gap-2">
-          <Button variant="outline-light" size="sm" onClick={() => navigate('/admin/profile')}>
-            Mon profil
-          </Button>
-          <Button variant="outline-light" size="sm" onClick={handleLogout}>
-            Déconnexion
-          </Button>
-        </div>
-      </Navbar>
-
-      <Container className="py-5">
-        <Row className="justify-content-center">
-          <Col xs={12} md={8} lg={6}>
-            <Card className="profile-card">
-              <Card.Body className="p-4 p-md-5">
-                <h4 className="fw-bold mb-1">Créer un compte Technicien / Responsable</h4>
-                <p className="text-muted mb-4">
-                  Un matricule (T.../R...) et un mot de passe temporaire seront générés
-                  et envoyés automatiquement par email.
-                </p>
-
+    <>
+      <PageHeader
+        eyebrow="Administration"
+        title="Créer un compte personnel"
+        subtitle="Un matricule (T…/R…) et un mot de passe temporaire sont générés et envoyés automatiquement par email."
+      />
+      <Row>
+        <Col xs={12} lg={8} xl={7}>
+          <Panel>
                 {error && <Alert variant="danger">{error}</Alert>}
                 {success && <Alert variant="success">{success}</Alert>}
 
@@ -136,15 +113,13 @@ export default function CreateStaffPage() {
                     />
                   </Form.Group>
 
-                  <Button type="submit" variant="primary" className="w-100 auth-submit-btn" disabled={loading}>
+                  <Button type="submit" variant="primary" className="w-100" disabled={loading}>
                     {loading ? <Spinner size="sm" animation="border" /> : 'Créer le compte et envoyer les identifiants'}
                   </Button>
                 </Form>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    </div>
+          </Panel>
+        </Col>
+      </Row>
+    </>
   );
 }

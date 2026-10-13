@@ -29,6 +29,45 @@ export interface Intervention {
   date_cloture: string | null;
 }
 
+export interface InterventionDetail extends Intervention {
+  client_telephone: string | null;
+  technicien_email: string | null;
+  technicien_telephone: string | null;
+  affectee_par_nom: string | null;
+  updated_at: string;
+  duree_resolution_heures: number | null;
+}
+
+export interface CalendarIntervention extends Intervention {
+  date_calendrier: string;
+}
+
+export interface CalendarRow {
+  technicien: { id: number; matricule: string | null; first_name: string; last_name: string; email: string };
+  interventions: CalendarIntervention[];
+}
+
+export interface DashboardData {
+  role: string;
+  total: number;
+  par_statut: Record<Intervention['statut'], number>;
+  par_priorite: Record<Intervention['priorite'], number>;
+  par_mois: { mois: string; creees: number; terminees: number }[];
+  taux_resolution: number;
+  temps_moyen_resolution_heures: number | null;
+  note_moyenne: number | null;
+  nb_avis: number;
+  urgentes_ouvertes: number;
+  prevues_aujourdhui: number;
+  en_retard: number;
+  recentes: Intervention[];
+  par_technicien?: {
+    id: number; nom: string; matricule: string | null; total: number; terminees: number; en_cours: number;
+  }[];
+  techniciens?: { total: number; localises: number; disponibles: number };
+  utilisateurs?: { total: number; inactifs: number; par_role: Record<string, number> };
+}
+
 export interface Stats {
   par_statut: { statut: string; total: number }[];
   par_technicien: {
@@ -53,6 +92,13 @@ export const createIntervention = (data: {
 
 export const listInterventions = (statut?: string) =>
   api.get<Intervention[]>('/interventions/', { params: statut ? { statut } : {} });
+
+export const getIntervention = (id: number | string) =>
+  api.get<InterventionDetail>(`/interventions/${id}/`);
+
+// ---------- Tableau de bord (tous les rôles, périmètre selon le rôle) ----------
+
+export const getDashboard = () => api.get<DashboardData>('/interventions/dashboard/');
 
 // ---------- Affectation (responsable) ----------
 
@@ -99,7 +145,7 @@ export const submitAvis = (id: number, note: number, commentaire: string) =>
 // ---------- Calendrier (responsable) ----------
 
 export const getCalendar = (start: string, end: string) =>
-  api.get('/interventions/calendar/', { params: { start, end } });
+  api.get<CalendarRow[]>('/interventions/calendar/', { params: { start, end } });
 
 // ---------- Statistiques (responsable/admin) ----------
 

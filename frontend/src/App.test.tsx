@@ -1,9 +1,9 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+test('affiche la page de connexion unifiée quand personne n\'est connecté', () => {
+  localStorage.clear();
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /connexion/i })).toBeInTheDocument();
+  expect(screen.getByLabelText(/email ou matricule/i)).toBeInTheDocument();
 });

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner, Navbar } from 'react-bootstrap';
+import { Row, Col, Form, Button, Alert, Spinner } from 'react-bootstrap';
+import { Stars } from 'react-bootstrap-icons';
 import { useNavigate } from 'react-router-dom';
 import { createIntervention, generateDescription } from '../../api/interventions';
-import { useAuth } from '../../context/AuthContext';
+import { PageHeader, Panel } from '../../components/ui';
 
 export default function NewInterventionPage() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [form, setForm] = useState({
     type_panne: '', description: '', priorite: 'NORMALE', date_souhaitee: '',
   });
@@ -62,109 +62,107 @@ export default function NewInterventionPage() {
   };
 
   return (
-    <div>
-      <Navbar className="px-4 py-3" bg="primary" variant="dark">
-        <Navbar.Brand className="fw-bold">Espace Client</Navbar.Brand>
-        <div className="ms-auto d-flex gap-2">
-          <Button variant="outline-light" size="sm" onClick={() => navigate('/client/mes-interventions')}>
-            Mes demandes
-          </Button>
-          <Button variant="outline-light" size="sm" onClick={() => { logout(); navigate('/login'); }}>
-            Déconnexion
-          </Button>
-          <Button variant="outline-light" size="sm" onClick={() => navigate('/client/dashboard')}>
-            Retour au tableau de bord
-          </Button>
-        </div>
-      </Navbar>
+    <>
+      <PageHeader
+        eyebrow="Espace client"
+        title="Nouvelle demande d'intervention"
+        subtitle="Décrivez le problème rencontré : un responsable affectera un technicien rapidement."
+      />
+      <Row className="g-4">
+        <Col lg={8}>
+          <Panel>
+            {error && <Alert variant="danger">{error}</Alert>}
+            {success && <Alert variant="success">Demande envoyée avec succès ! Redirection…</Alert>}
 
-      <Container className="py-5">
-        <Row className="justify-content-center">
-          <Col xs={12} md={8} lg={6}>
-            <Card className="shadow-sm">
-              <Card.Body className="p-4 p-md-5">
-                <h4 className="fw-bold mb-1">Nouvelle demande d'intervention</h4>
-                <p className="text-muted mb-4">Décrivez le problème rencontré.</p>
+            <Form onSubmit={handleSubmit}>
+              <Form.Group className="mb-3">
+                <Form.Label>Type de panne / besoin</Form.Label>
+                <Form.Control
+                  name="type_panne"
+                  value={form.type_panne}
+                  onChange={handleChange}
+                  placeholder="Ex : Climatiseur en panne"
+                  required
+                />
+              </Form.Group>
 
-                {error && <Alert variant="danger">{error}</Alert>}
-                {success && <Alert variant="success">Demande envoyée avec succès !</Alert>}
-
-                <Form onSubmit={handleSubmit}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Type de panne / besoin</Form.Label>
-                    <Form.Control
-                      name="type_panne"
-                      value={form.type_panne}
-                      onChange={handleChange}
-                      placeholder="Ex: Climatiseur en panne"
-                      required
-                    />
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <div className="d-flex justify-content-between align-items-center mb-1">
-                      <Form.Label className="mb-0">Description</Form.Label>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={handleGenerateDescription}
-                        disabled={generating}
-                      >
-                        {generating ? (
-                          <>
-                            <Spinner size="sm" animation="border" className="me-1" />
-                            Génération...
-                          </>
-                        ) : (
-                          '✨ Générer une description'
-                        )}
-                      </Button>
-                    </div>
-                    {genError && <div className="text-danger small mb-2">{genError}</div>}
-                    <Form.Control
-                      as="textarea"
-                      rows={4}
-                      name="description"
-                      value={form.description}
-                      onChange={handleChange}
-                      required
-                    />
-                  </Form.Group>
-
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Priorité</Form.Label>
-                        <Form.Select name="priorite" value={form.priorite} onChange={handleSelectChange}>
-                          <option value="BASSE">Basse</option>
-                          <option value="NORMALE">Normale</option>
-                          <option value="HAUTE">Haute</option>
-                          <option value="URGENTE">Urgente</option>
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-4">
-                        <Form.Label>Date souhaitée (optionnel)</Form.Label>
-                        <Form.Control
-                          type="date"
-                          name="date_souhaitee"
-                          value={form.date_souhaitee}
-                          onChange={handleChange}
-                        />
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  <Button type="submit" variant="primary" className="w-100" disabled={loading}>
-                    {loading ? <Spinner size="sm" animation="border" /> : 'Envoyer la demande'}
+              <Form.Group className="mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-1">
+                  <Form.Label className="mb-0">Description</Form.Label>
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={handleGenerateDescription}
+                    disabled={generating}
+                  >
+                    {generating ? (
+                      <>
+                        <Spinner size="sm" animation="border" className="me-1" />
+                        Génération…
+                      </>
+                    ) : (
+                      <><Stars className="me-1" /> Générer avec l'IA</>
+                    )}
                   </Button>
-                </Form>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
-    </div>
+                </div>
+                {genError && <div className="text-danger small mb-2">{genError}</div>}
+                <Form.Control
+                  as="textarea"
+                  rows={5}
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  placeholder="Symptômes, depuis quand, localisation de l'équipement…"
+                  required
+                />
+                <Form.Text>Vous pouvez modifier librement la suggestion de l'IA avant l'envoi.</Form.Text>
+              </Form.Group>
+
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Priorité</Form.Label>
+                    <Form.Select name="priorite" value={form.priorite} onChange={handleSelectChange}>
+                      <option value="BASSE">Basse</option>
+                      <option value="NORMALE">Normale</option>
+                      <option value="HAUTE">Haute</option>
+                      <option value="URGENTE">Urgente</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-4">
+                    <Form.Label>Date souhaitée (optionnel)</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="date_souhaitee"
+                      value={form.date_souhaitee}
+                      onChange={handleChange}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <div className="d-flex gap-2 justify-content-end">
+                <Button variant="outline-secondary" onClick={() => navigate('/client/dashboard')}>Annuler</Button>
+                <Button type="submit" variant="primary" disabled={loading}>
+                  {loading ? <Spinner size="sm" animation="border" /> : 'Envoyer la demande'}
+                </Button>
+              </div>
+            </Form>
+          </Panel>
+        </Col>
+        <Col lg={4}>
+          <Panel title="Comment ça marche ?">
+            <ol className="howto">
+              <li><strong>Vous décrivez</strong> le problème (l'IA peut vous aider à rédiger).</li>
+              <li><strong>Un responsable</strong> affecte un technicien qualifié.</li>
+              <li><strong>Le technicien intervient</strong> et documente avec photos avant / après.</li>
+              <li><strong>Vous recevez</strong> le rapport PDF et pouvez laisser un avis.</li>
+            </ol>
+          </Panel>
+        </Col>
+      </Row>
+    </>
   );
 }

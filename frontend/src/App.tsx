@@ -1,18 +1,20 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AppLayout from './components/AppLayout';
 
 // Public / Auth
-import RoleSelectPage from './pages/RoleSelectPage';
-import ClientLoginPage from './pages/ClientLoginPage';
-import StaffLoginPage from './pages/StaffLoginPage';
+import LoginPage from './pages/LoginPage';
+import SpaceSelectPage from './pages/SpaceSelectPage';
 import SignupPage from './pages/SignupPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ProfilePage from './pages/ProfilePage';
+import InterventionDetailPage from './pages/InterventionDetailPage';
 
 // Admin
-import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
 import CreateStaffPage from './pages/CreateStaffPage';
 
 // Client
@@ -21,13 +23,21 @@ import NewInterventionPage from './pages/client/NewInterventionPage';
 import MyInterventionsPage from './pages/client/MyInterventionsPage';
 
 // Responsable
+import ResponsableDashboardPage from './pages/responsable/ResponsableDashboardPage';
 import InterventionsListPage from './pages/responsable/InterventionsListPage';
 import CalendarPage from './pages/responsable/CalendarPage';
 import EquipmentsPage from './pages/responsable/EquipmentsPage';
 import TrackingPage from './pages/responsable/TrackingPage';
 
 // Technicien
+import TechnicienDashboardPage from './pages/technicien/TechnicienDashboardPage';
 import MyTasksPage from './pages/technicien/MyTasksPage';
+import PositionPage from './pages/technicien/PositionPage';
+
+function HomeRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={user ? '/choisir-espace' : '/login'} replace />;
+}
 
 export default function App() {
   return (
@@ -35,134 +45,57 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* ---------- Public / Auth ---------- */}
-          <Route path="/" element={<RoleSelectPage />} />
-          <Route path="/login" element={<ClientLoginPage />} />
-          <Route path="/staff-login" element={<StaffLoginPage />} />
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/staff-login" element={<Navigate to="/login" replace />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-          {/* ---------- Admin ---------- */}
-          <Route
-            path="/admin/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
-                <AdminDashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/create-staff"
-            element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
-                <CreateStaffPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/profile"
-            element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
+          {/* Sélection du rôle / de l'espace, juste après la connexion */}
+          <Route path="/choisir-espace" element={<SpaceSelectPage />} />
 
-          {/* ---------- Client ---------- */}
-          <Route
-            path="/client/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={['CLIENT']}>
-                <ClientDashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/client/nouvelle-demande"
-            element={
-              <ProtectedRoute allowedRoles={['CLIENT']}>
-                <NewInterventionPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/client/mes-interventions"
-            element={
-              <ProtectedRoute allowedRoles={['CLIENT']}>
-                <MyInterventionsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/client/profile"
-            element={
-              <ProtectedRoute allowedRoles={['CLIENT']}>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
+          {/* ---------- Espaces connectés (layout commun : sidebar + barre du haut) ---------- */}
+          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+            {/* Admin */}
+            <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/admin/utilisateurs" element={<AdminUsersPage />} />
+              <Route path="/admin/create-staff" element={<CreateStaffPage />} />
+              <Route path="/admin/profile" element={<ProfilePage />} />
+            </Route>
 
-          {/* ---------- Responsable ---------- */}
-          <Route
-            path="/responsable/interventions"
-            element={
-              <ProtectedRoute allowedRoles={['RESPONSABLE', 'ADMIN']}>
-                <InterventionsListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/responsable/calendrier"
-            element={
-              <ProtectedRoute allowedRoles={['RESPONSABLE', 'ADMIN']}>
-                <CalendarPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/responsable/equipements"
-            element={
-              <ProtectedRoute allowedRoles={['RESPONSABLE', 'ADMIN']}>
-                <EquipmentsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/responsable/tracking"
-            element={
-              <ProtectedRoute allowedRoles={['RESPONSABLE', 'ADMIN']}>
-                <TrackingPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Client */}
+            <Route element={<ProtectedRoute allowedRoles={['CLIENT']} />}>
+              <Route path="/client/dashboard" element={<ClientDashboardPage />} />
+              <Route path="/client/nouvelle-demande" element={<NewInterventionPage />} />
+              <Route path="/client/mes-interventions" element={<MyInterventionsPage />} />
+              <Route path="/client/interventions/:id" element={<InterventionDetailPage />} />
+              <Route path="/client/profile" element={<ProfilePage />} />
+            </Route>
 
-          {/* ---------- Technicien ---------- */}
-          <Route
-            path="/technicien/mes-taches"
-            element={
-              <ProtectedRoute allowedRoles={['TECHNICIEN']}>
-                <MyTasksPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/technicien/profile"
-            element={
-              <ProtectedRoute allowedRoles={['TECHNICIEN', 'ADMIN']}>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Responsable maintenance (accessible aussi à l'admin) */}
+            <Route element={<ProtectedRoute allowedRoles={['RESPONSABLE', 'ADMIN']} />}>
+              <Route path="/responsable/dashboard" element={<ResponsableDashboardPage />} />
+              <Route path="/responsable/interventions" element={<InterventionsListPage />} />
+              <Route path="/responsable/interventions/:id" element={<InterventionDetailPage />} />
+              <Route path="/responsable/calendrier" element={<CalendarPage />} />
+              <Route path="/responsable/equipements" element={<EquipmentsPage />} />
+              <Route path="/responsable/tracking" element={<TrackingPage />} />
+              <Route path="/responsable/profile" element={<ProfilePage />} />
+            </Route>
 
-          {/* ---------- Profil (partagé par tous les rôles connectés) ---------- */}
-          <Route
-            path="/client/profile"
-            element={
-              <ProtectedRoute allowedRoles={['CLIENT', 'ADMIN', 'TECHNICIEN', 'RESPONSABLE']}>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Technicien */}
+            <Route element={<ProtectedRoute allowedRoles={['TECHNICIEN']} />}>
+              <Route path="/technicien/dashboard" element={<TechnicienDashboardPage />} />
+              <Route path="/technicien/mes-taches" element={<MyTasksPage />} />
+              <Route path="/technicien/interventions/:id" element={<InterventionDetailPage />} />
+              <Route path="/technicien/position" element={<PositionPage />} />
+              <Route path="/technicien/profile" element={<ProfilePage />} />
+            </Route>
+          </Route>
+
+          <Route path="*" element={<HomeRedirect />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

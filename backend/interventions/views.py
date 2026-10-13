@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 import os
 from io import BytesIO
 import base64
@@ -6,7 +7,7 @@ from PIL import Image, ImageOps
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
-from django.db.models import Avg, Count, F
+from django.db.models import Avg, Count, F, Q
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -19,13 +20,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from xhtml2pdf import pisa
 
-from .models import Intervention, StatutIntervention
+from tracking.models import TechnicianLocation
+
+from .models import Intervention, Priorite, StatutIntervention
 from .permissions import IsClient, IsResponsableOrAdmin, IsTechnicien
 from .serializers import (
     AIDescriptionRequestSerializer,
     AvisSerializer,
     InterventionAssignSerializer,
     InterventionCreateSerializer,
+    InterventionDetailSerializer,
     InterventionListSerializer,
     InterventionStatusUpdateSerializer,
     PhotoUploadSerializer,
@@ -77,6 +81,33 @@ class InterventionListView(generics.ListAPIView):
 
     def get_serializer_context(self):
         return {'request': self.request}
+
+
+def _visible_interventions(user):
+    """Interventions visibles selon le rôle (mêmes règles que la liste)."""
+    qs = Intervention.objects.select_related('client', 'technicien', 'affectee_par')
+    if user.role == 'CLIENT':
+        return qs.filter(client=user)
+    if user.role == 'TECHNICIEN':
+        return qs.filter(technicien=user)
+    return qs
+
+
+class InterventionDetailView(APIView):
+    """
+    GET /api/interventions/<id>/ — détails complets d'une intervention.
+    CLIENT -> ses demandes | TECHNICIEN -> celles qui lui sont affectées | RESPONSABLE/ADMIN -> toutes.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            intervention = _visible_interventions(request.user).get(pk=pk)
+        except Intervention.DoesNotExist:
+            return Response({"detail": "Intervention introuvable."}, status=404)
+        return Response(
+            InterventionDetailSerializer(intervention, context={'request': request}).data
+        )
 
 
 class InterventionAssignView(APIView):
@@ -300,11 +331,25 @@ class InterventionStatsView(APIView):
         })
 
 
+def _calendar_day(intervention):
+    """
+    Jour où l'intervention apparaît dans le planning :
+    - terminée -> date de clôture (ce qui a été fait)
+    - sinon    -> date souhaitée, à défaut date d'affectation / de création (rien ne disparaît)
+    """
+    if intervention.statut == StatutIntervention.TERMINEE and intervention.date_cloture:
+        return tz.localtime(intervention.date_cloture).date()
+    if intervention.date_souhaitee:
+        return intervention.date_souhaitee
+    reference = intervention.date_affectation or intervention.created_at
+    return tz.localtime(reference).date()
+
+
 class TechnicianCalendarView(APIView):
     """
     GET /api/interventions/calendar/?start=YYYY-MM-DD&end=YYYY-MM-DD
-    Réservé au responsable : chaque technicien + ses interventions (affectées/en cours)
-    dans la période, pour visualiser les disponibilités.
+    Réservé au responsable : chaque technicien + ses interventions (affectées, en cours
+    et terminées) dans la période. Chaque intervention porte `date_calendrier`.
     """
     permission_classes = [IsResponsableOrAdmin]
 
@@ -312,25 +357,152 @@ class TechnicianCalendarView(APIView):
         start = parse_date(request.query_params.get('start', '') or '')
         end = parse_date(request.query_params.get('end', '') or '')
 
-        data = []
-        for tech in User.objects.filter(role='TECHNICIEN'):
-            qs = Intervention.objects.filter(
-                technicien=tech,
-                statut__in=[StatutIntervention.AFFECTEE, StatutIntervention.EN_COURS],
-            )
-            if start:
-                qs = qs.filter(date_souhaitee__gte=start)
-            if end:
-                qs = qs.filter(date_souhaitee__lte=end)
+        interventions = Intervention.objects.select_related('client', 'technicien').filter(
+            technicien__isnull=False,
+            statut__in=[
+                StatutIntervention.AFFECTEE,
+                StatutIntervention.EN_COURS,
+                StatutIntervention.TERMINEE,
+            ],
+        )
 
-            data.append({
+        par_technicien = {}
+        for intervention in interventions:
+            jour = _calendar_day(intervention)
+            if (start and jour < start) or (end and jour > end):
+                continue
+            item = InterventionListSerializer(intervention, context={'request': request}).data
+            item['date_calendrier'] = jour.isoformat()
+            par_technicien.setdefault(intervention.technicien_id, []).append(item)
+
+        data = [
+            {
                 'technicien': TechnicianMiniSerializer(tech).data,
-                'interventions': InterventionListSerializer(
-                    qs, many=True, context={'request': request}
-                ).data,
-            })
-
+                'interventions': par_technicien.get(tech.id, []),
+            }
+            for tech in User.objects.filter(role='TECHNICIEN').order_by('matricule')
+        ]
         return Response(data, status=200)
+
+
+class DashboardView(APIView):
+    """
+    GET /api/interventions/dashboard/ — indicateurs du tableau de bord, calculés
+    sur le périmètre du rôle connecté (client : ses demandes, technicien : ses tâches,
+    responsable/admin : toutes les interventions).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        qs = _visible_interventions(user)
+        today = tz.localdate()
+
+        par_statut = {choice: 0 for choice in StatutIntervention.values}
+        for row in qs.values('statut').annotate(total=Count('id')):
+            par_statut[row['statut']] = row['total']
+
+        par_priorite = {choice: 0 for choice in Priorite.values}
+        for row in qs.values('priorite').annotate(total=Count('id')):
+            par_priorite[row['priorite']] = row['total']
+
+        # 6 derniers mois, mois sans intervention inclus (courbe continue)
+        mois = []
+        cursor = today.replace(day=1)
+        for _ in range(6):
+            mois.insert(0, cursor)
+            cursor = (cursor - timedelta(days=1)).replace(day=1)
+        totaux_mois = {
+            row['mois'].strftime('%Y-%m'): row['total']
+            for row in qs.filter(created_at__date__gte=mois[0])
+            .annotate(mois=TruncMonth('created_at'))
+            .values('mois')
+            .annotate(total=Count('id'))
+        }
+        terminees_mois = {
+            row['mois'].strftime('%Y-%m'): row['total']
+            for row in qs.filter(statut=StatutIntervention.TERMINEE, date_cloture__date__gte=mois[0])
+            .annotate(mois=TruncMonth('date_cloture'))
+            .values('mois')
+            .annotate(total=Count('id'))
+        }
+        par_mois = [
+            {
+                'mois': m.strftime('%Y-%m'),
+                'creees': totaux_mois.get(m.strftime('%Y-%m'), 0),
+                'terminees': terminees_mois.get(m.strftime('%Y-%m'), 0),
+            }
+            for m in mois
+        ]
+
+        temps_moyen = qs.filter(
+            statut=StatutIntervention.TERMINEE, date_debut__isnull=False, date_cloture__isnull=False,
+        ).aggregate(avg=Avg(F('date_cloture') - F('date_debut')))['avg']
+        avis = qs.filter(avis__isnull=False).aggregate(moyenne=Avg('avis__note'), total=Count('avis'))
+
+        total = qs.count()
+        ouvertes = qs.exclude(statut=StatutIntervention.TERMINEE)
+        data = {
+            'role': user.role,
+            'total': total,
+            'par_statut': par_statut,
+            'par_priorite': par_priorite,
+            'par_mois': par_mois,
+            'taux_resolution': round(100 * par_statut[StatutIntervention.TERMINEE] / total) if total else 0,
+            'temps_moyen_resolution_heures': (
+                round(temps_moyen.total_seconds() / 3600, 1) if temps_moyen else None
+            ),
+            'note_moyenne': round(avis['moyenne'], 1) if avis['moyenne'] else None,
+            'nb_avis': avis['total'],
+            'urgentes_ouvertes': ouvertes.filter(priorite__in=[Priorite.HAUTE, Priorite.URGENTE]).count(),
+            'prevues_aujourdhui': ouvertes.filter(date_souhaitee=today).count(),
+            'en_retard': ouvertes.filter(date_souhaitee__lt=today).count(),
+            'recentes': InterventionListSerializer(
+                qs[:6], many=True, context={'request': request}
+            ).data,
+        }
+
+        if user.role in ('RESPONSABLE', 'ADMIN'):
+            data['par_technicien'] = [
+                {
+                    'id': row['technicien'],
+                    'nom': f"{row['technicien__first_name']} {row['technicien__last_name']}".strip(),
+                    'matricule': row['technicien__matricule'],
+                    'total': row['total'],
+                    'terminees': row['terminees'],
+                    'en_cours': row['en_cours'],
+                }
+                for row in qs.exclude(technicien__isnull=True)
+                .values('technicien', 'technicien__first_name', 'technicien__last_name', 'technicien__matricule')
+                .annotate(
+                    total=Count('id'),
+                    terminees=Count('id', filter=Q(statut=StatutIntervention.TERMINEE)),
+                    en_cours=Count('id', filter=Q(statut__in=[
+                        StatutIntervention.AFFECTEE, StatutIntervention.EN_COURS,
+                    ])),
+                )
+                .order_by('-total')[:8]
+            ]
+            seuil = tz.now() - timedelta(minutes=10)
+            data['techniciens'] = {
+                'total': User.objects.filter(role='TECHNICIEN', is_active=True).count(),
+                'localises': TechnicianLocation.objects.filter(updated_at__gte=seuil).count(),
+                'disponibles': User.objects.filter(role='TECHNICIEN', is_active=True)
+                .exclude(interventions_affectees__statut=StatutIntervention.EN_COURS)
+                .count(),
+            }
+
+        if user.role == 'ADMIN':
+            data['utilisateurs'] = {
+                'total': User.objects.count(),
+                'inactifs': User.objects.filter(is_active=False).count(),
+                'par_role': {
+                    row['role']: row['total']
+                    for row in User.objects.values('role').annotate(total=Count('id'))
+                },
+            }
+
+        return Response(data)
 
 
 class InterventionAvisView(APIView):

@@ -7,14 +7,16 @@ from .views import (
     InterventionPhotoUploadView,
     InterventionPDFView,
     InterventionStatsView,
-    TechnicianCalendarView, InterventionAvisView, InterventionAIDescriptionView
-
+    TechnicianCalendarView, InterventionAvisView, InterventionAIDescriptionView,
+    InterventionDetailView, DashboardView,
 )
 
 urlpatterns = [
     path('', InterventionListView.as_view(), name='intervention-list'),
     path('create/', InterventionCreateView.as_view(), name='intervention-create'),
     path('calendar/', TechnicianCalendarView.as_view(), name='intervention-calendar'),
+    path('dashboard/', DashboardView.as_view(), name='intervention-dashboard'),
+    path('<int:pk>/', InterventionDetailView.as_view(), name='intervention-detail'),
     path('stats/', InterventionStatsView.as_view(), name='intervention-stats'),
     path('<int:pk>/avis/', InterventionAvisView.as_view(), name='intervention-avis'),
     path('<int:pk>/assign/', InterventionAssignView.as_view(), name='intervention-assign'),

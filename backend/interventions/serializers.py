@@ -26,23 +26,6 @@ class InterventionCreateSerializer(serializers.ModelSerializer):
         return Intervention.objects.create(client=request.user, **validated_data)
 
 
-class InterventionListSerializer(serializers.ModelSerializer):
-    """Vue liste, utilisée par tous les rôles avec des querysets filtrés."""
-    client_nom = serializers.CharField(source='client.full_name', read_only=True)
-    client_email = serializers.CharField(source='client.email', read_only=True)
-    technicien_nom = serializers.CharField(source='technicien.full_name', read_only=True)
-    technicien_matricule = serializers.CharField(source='technicien.matricule', read_only=True)
-
-    class Meta:
-        model = Intervention
-        fields = [
-            'id', 'client_nom', 'client_email', 'type_panne', 'description',
-            'priorite', 'date_souhaitee', 'statut',
-            'technicien', 'technicien_nom', 'technicien_matricule',
-            'created_at', 'date_affectation', 'date_debut', 'date_cloture',
-        ]
-
-
 class InterventionAssignSerializer(serializers.Serializer):
     """Le responsable affecte un technicien à une intervention EN_ATTENTE."""
     technicien_id = serializers.IntegerField()
@@ -170,6 +153,26 @@ class InterventionListSerializer(serializers.ModelSerializer):
         if avis:
             return AvisSerializer(avis).data
         return None
+
+class InterventionDetailSerializer(InterventionListSerializer):
+    """Vue détaillée d'une intervention (page « Détails ») : ajoute les contacts et la traçabilité."""
+    client_telephone = serializers.CharField(source='client.phone', read_only=True)
+    technicien_email = serializers.CharField(source='technicien.email', read_only=True)
+    technicien_telephone = serializers.CharField(source='technicien.phone', read_only=True)
+    affectee_par_nom = serializers.CharField(source='affectee_par.full_name', read_only=True)
+    duree_resolution_heures = serializers.SerializerMethodField()
+
+    class Meta(InterventionListSerializer.Meta):
+        fields = InterventionListSerializer.Meta.fields + [
+            'client_telephone', 'technicien_email', 'technicien_telephone',
+            'affectee_par_nom', 'updated_at', 'duree_resolution_heures',
+        ]
+
+    def get_duree_resolution_heures(self, obj):
+        if obj.date_debut and obj.date_cloture:
+            return round((obj.date_cloture - obj.date_debut).total_seconds() / 3600, 1)
+        return None
+
 
 class AIDescriptionRequestSerializer(serializers.Serializer):
     """Validation de la requête envoyée par le frontend pour générer une description."""

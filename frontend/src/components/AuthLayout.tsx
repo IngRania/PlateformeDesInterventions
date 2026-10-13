@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { CheckCircleFill, GearFill } from 'react-bootstrap-icons';
 
 interface Props {
   children: ReactNode;
@@ -12,15 +13,15 @@ export default function AuthLayout({ children, brandTitle, brandSubtitle }: Prop
       <div className="auth-brand-panel">
         <div className="auth-brand-content">
           <div className="auth-brand-logo">
-            <span className="brand-icon">⚙️</span> InTech Interventions
+            <span className="brand-mark"><GearFill /></span> InTech Interventions
           </div>
           <h1 className="auth-brand-title">{brandTitle}</h1>
           <p className="auth-brand-subtitle">{brandSubtitle}</p>
 
           <ul className="auth-brand-features">
-            <li>Gestion des interventions techniques</li>
-            <li>Suivi en temps réel par rôle</li>
-            <li>Sécurisé et centralisé</li>
+            <li><CheckCircleFill /> Demandes d'intervention assistées par IA</li>
+            <li><CheckCircleFill /> Suivi en temps réel et localisation des techniciens</li>
+            <li><CheckCircleFill /> Rapports PDF et tableaux de bord par rôle</li>
           </ul>
         </div>
         <div className="auth-brand-shape auth-brand-shape-1" />
